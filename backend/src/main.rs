@@ -4,6 +4,7 @@ use axum::{
     Json, Router,
 };
 use chrono::NaiveDate;
+use migration::{Migrator, MigratorTrait};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Database, DatabaseConnection, EntityTrait, QueryFilter, Set,
 };
@@ -43,6 +44,8 @@ async fn main() -> anyhow::Result<()> {
     let database_url =
         std::env::var("DATABASE_URL").expect("DATABASE_URL must be set in .env");
     let db = Database::connect(database_url).await?;
+
+    Migrator::up(&db, None).await?;
 
     let app = Router::new()
         .route("/", get(root))
@@ -135,3 +138,5 @@ mod entity {
 
     impl ActiveModelBehavior for ActiveModel {}
 }
+
+mod migration;
