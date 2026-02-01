@@ -28,6 +28,7 @@ pub struct InvoiceResponse {
     pub description: String,
     pub amount: f64,
     pub currency: String,
+    pub user_address: String,
     pub date: NaiveDate,
 }
 
@@ -47,13 +48,17 @@ pub async fn create_invoice(
     headers: HeaderMap,
     Json(payload): Json<NewInvoice>,
 ) -> Result<Json<InvoiceResponse>, (axum::http::StatusCode, String)> {
-    let _user = require_user(&state, &headers).await?;
+    let user = require_user(&state, &headers).await?;
+    let user_address = user
+        .address
+        .ok_or_else(|| (axum::http::StatusCode::BAD_REQUEST, "User address is required".to_string()))?;
     let active = invoice::ActiveModel {
         id: Set(Uuid::new_v4()),
         client_name: Set(payload.client_name),
         description: Set(payload.description),
         amount: Set(payload.amount),
         currency: Set(payload.currency),
+        user_address: Set(user_address.clone()),
         date: Set(payload.date),
     };
 
@@ -68,6 +73,7 @@ pub async fn create_invoice(
         description: invoice.description,
         amount: invoice.amount,
         currency: invoice.currency,
+        user_address: invoice.user_address,
         date: invoice.date,
     }))
 }
@@ -109,6 +115,7 @@ pub async fn get_invoice(
         description: invoice.description,
         amount: invoice.amount,
         currency: invoice.currency,
+        user_address: invoice.user_address,
         date: invoice.date,
     }))
 }

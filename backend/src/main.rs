@@ -13,6 +13,10 @@ use modules::auth::{
     __path_login, __path_logout, __path_me, __path_register, login, logout, me, register,
     LoginRequest, RegisterRequest, SessionResponse, UserResponse,
 };
+use modules::company::{
+    __path_create_company, __path_get_my_company, create_company, get_my_company,
+    CompanyCreateRequest, CompanyResponse,
+};
 use modules::invoices::{
     __path_create_invoice, __path_get_invoice, create_invoice, get_invoice, InvoiceResponse,
     NewInvoice,
@@ -25,6 +29,8 @@ use modules::shared::AppState;
         root,
         create_invoice,
         get_invoice,
+        create_company,
+        get_my_company,
         register,
         login,
         logout,
@@ -33,6 +39,8 @@ use modules::shared::AppState;
     components(schemas(
         NewInvoice,
         InvoiceResponse,
+        CompanyCreateRequest,
+        CompanyResponse,
         RegisterRequest,
         LoginRequest,
         UserResponse,
@@ -41,7 +49,8 @@ use modules::shared::AppState;
     tags(
         (name = "health", description = "Health check"),
         (name = "invoices", description = "Invoice management"),
-        (name = "auth", description = "Authentication")
+        (name = "auth", description = "Authentication"),
+        (name = "company", description = "Company onboarding")
     )
 )]
 struct ApiDoc;
@@ -60,6 +69,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(root))
         .route("/invoices", post(create_invoice))
         .route("/invoices/:id", get(get_invoice))
+        .route("/company", post(create_company))
+        .route("/company/me", get(get_my_company))
         .route("/auth/register", post(register))
         .route("/auth/login", post(login))
         .route("/auth/logout", post(logout))

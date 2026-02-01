@@ -9,6 +9,7 @@ pub struct Model {
     pub description: String,
     pub amount: f64,
     pub currency: String,
+    pub user_address: String,
     pub date: Date,
 }
 

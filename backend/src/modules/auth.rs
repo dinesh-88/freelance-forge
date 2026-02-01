@@ -23,6 +23,7 @@ const SESSION_DURATION_DAYS: i64 = 7;
 pub struct RegisterRequest {
     pub email: String,
     pub password: String,
+    pub address: Option<String>,
 }
 
 #[derive(Deserialize, ToSchema)]
@@ -35,6 +36,8 @@ pub struct LoginRequest {
 pub struct UserResponse {
     pub id: Uuid,
     pub email: String,
+    pub address: Option<String>,
+    pub company_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -80,6 +83,8 @@ pub async fn register(
         id: Set(Uuid::new_v4()),
         email: Set(payload.email),
         password_hash: Set(password_hash),
+        address: Set(payload.address),
+        company_id: Set(None),
         created_at: Set(Utc::now()),
     };
 
@@ -98,6 +103,8 @@ pub async fn register(
             user: UserResponse {
                 id: user.id,
                 email: user.email,
+                address: user.address,
+                company_id: user.company_id,
                 created_at: user.created_at,
             },
         }),
@@ -139,6 +146,8 @@ pub async fn login(
             user: UserResponse {
                 id: user.id,
                 email: user.email,
+                address: user.address,
+                company_id: user.company_id,
                 created_at: user.created_at,
             },
         }),
@@ -200,6 +209,8 @@ pub async fn me(
     Ok(Json(UserResponse {
         id: user.id,
         email: user.email,
+        address: user.address,
+        company_id: user.company_id,
         created_at: user.created_at,
     }))
 }
