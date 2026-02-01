@@ -1,41 +1,50 @@
-use axum::{
-    extract::{Path, State},
-    routing::{get, post},
-    Json, Router,
-};
-use chrono::NaiveDate;
+use axum::{routing::{get, post}, Router};
 use migration::{Migrator, MigratorTrait};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Database, DatabaseConnection, EntityTrait, QueryFilter, Set,
-};
-use serde::{Deserialize, Serialize};
+use sea_orm::Database;
 use std::net::SocketAddr;
-use uuid::Uuid;
+use utoipa::OpenApi;
+use utoipa_swagger_ui::SwaggerUi;
 
-#[derive(Clone)]
-struct AppState {
-    db: DatabaseConnection,
-}
+mod entity;
+mod migration;
+mod modules;
 
-// ---------- Create Invoice Payload ----------
-#[derive(Deserialize)]
-struct NewInvoice {
-    client_name: String,
-    description: String,
-    amount: f64,
-    currency: String,
-    date: NaiveDate,
-}
+use modules::auth::{
+    __path_login, __path_logout, __path_me, __path_register, login, logout, me, register,
+    LoginRequest, RegisterRequest, SessionResponse, UserResponse,
+};
+use modules::invoices::{
+    __path_create_invoice, __path_get_invoice, create_invoice, get_invoice, InvoiceResponse,
+    NewInvoice,
+};
+use modules::shared::AppState;
 
-#[derive(Serialize)]
-struct InvoiceResponse {
-    id: Uuid,
-    client_name: String,
-    description: String,
-    amount: f64,
-    currency: String,
-    date: NaiveDate,
-}
+#[derive(OpenApi)]
+#[openapi(
+    paths(
+        root,
+        create_invoice,
+        get_invoice,
+        register,
+        login,
+        logout,
+        me
+    ),
+    components(schemas(
+        NewInvoice,
+        InvoiceResponse,
+        RegisterRequest,
+        LoginRequest,
+        UserResponse,
+        SessionResponse
+    )),
+    tags(
+        (name = "health", description = "Health check"),
+        (name = "invoices", description = "Invoice management"),
+        (name = "auth", description = "Authentication")
+    )
+)]
+struct ApiDoc;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -51,9 +60,14 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(root))
         .route("/invoices", post(create_invoice))
         .route("/invoices/:id", get(get_invoice))
+        .route("/auth/register", post(register))
+        .route("/auth/login", post(login))
+        .route("/auth/logout", post(logout))
+        .route("/auth/me", get(me))
+        .merge(SwaggerUi::new("/docs").url("/api-doc/openapi.json", ApiDoc::openapi()))
         .with_state(AppState { db });
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     println!("🚀 Running at http://{}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
@@ -61,81 +75,14 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[utoipa::path(
+    get,
+    path = "/",
+    responses(
+        (status = 200, description = "API is live", body = String)
+    ),
+    tag = "health"
+)]
 async fn root() -> &'static str {
     "📋 Freelance Forge API is live"
 }
-
-async fn create_invoice(
-    State(state): State<AppState>,
-    Json(payload): Json<NewInvoice>,
-) -> Result<Json<InvoiceResponse>, (axum::http::StatusCode, String)> {
-    let active = entity::ActiveModel {
-        id: Set(Uuid::new_v4()),
-        client_name: Set(payload.client_name),
-        description: Set(payload.description),
-        amount: Set(payload.amount),
-        currency: Set(payload.currency),
-        date: Set(payload.date),
-    };
-
-    let invoice = active
-        .insert(&state.db)
-        .await
-        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
-
-    Ok(Json(InvoiceResponse {
-        id: invoice.id,
-        client_name: invoice.client_name,
-        description: invoice.description,
-        amount: invoice.amount,
-        currency: invoice.currency,
-        date: invoice.date,
-    }))
-}
-
-async fn get_invoice(
-    State(state): State<AppState>,
-    Path(id): Path<String>,
-) -> Result<Json<InvoiceResponse>, (axum::http::StatusCode, String)> {
-    let id = Uuid::parse_str(&id)
-        .map_err(|_| (axum::http::StatusCode::BAD_REQUEST, "Invalid id".to_string()))?;
-
-    let invoice = entity::Entity::find()
-        .filter(entity::Column::Id.eq(id))
-        .one(&state.db)
-        .await
-        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
-        .ok_or_else(|| (axum::http::StatusCode::NOT_FOUND, "Invoice not found".to_string()))?;
-
-    Ok(Json(InvoiceResponse {
-        id: invoice.id,
-        client_name: invoice.client_name,
-        description: invoice.description,
-        amount: invoice.amount,
-        currency: invoice.currency,
-        date: invoice.date,
-    }))
-}
-
-mod entity {
-    use sea_orm::entity::prelude::*;
-
-    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-    #[sea_orm(table_name = "invoices")]
-    pub struct Model {
-        #[sea_orm(primary_key)]
-        pub id: Uuid,
-        pub client_name: String,
-        pub description: String,
-        pub amount: f64,
-        pub currency: String,
-        pub date: Date,
-    }
-
-    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-    pub enum Relation {}
-
-    impl ActiveModelBehavior for ActiveModel {}
-}
-
-mod migration;
