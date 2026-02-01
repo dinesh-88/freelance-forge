@@ -4,23 +4,24 @@ use sea_orm::Database;
 use std::net::SocketAddr;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::CorsLayer;
 
 mod entity;
 mod migration;
 mod modules;
 
 use modules::auth::{
-    __path_login, __path_logout, __path_me, __path_register, login, logout, me, register,
-    LoginRequest, RegisterRequest, SessionResponse, UserResponse,
+    __path_login, __path_logout, __path_me, __path_register, __path_update_profile, login,
+    logout, me, register, update_profile, LoginRequest, RegisterRequest, SessionResponse,
+    UpdateProfileRequest, UserResponse,
 };
 use modules::company::{
-    __path_create_company, __path_get_my_company, create_company, get_my_company,
-    CompanyCreateRequest, CompanyResponse,
+    __path_create_company, __path_get_my_company, __path_list_companies, create_company,
+    get_my_company, list_companies, CompanyCreateRequest, CompanyResponse,
 };
 use modules::invoices::{
-    __path_create_invoice, __path_get_invoice, create_invoice, get_invoice, InvoiceResponse,
-    NewInvoice,
+    __path_create_invoice, __path_get_invoice, __path_get_invoice_pdf, create_invoice, get_invoice,
+    get_invoice_pdf, InvoiceResponse, NewInvoice,
 };
 use modules::shared::AppState;
 
@@ -30,9 +31,12 @@ use modules::shared::AppState;
         root,
         create_invoice,
         get_invoice,
+        get_invoice_pdf,
         create_company,
         get_my_company,
+        list_companies,
         register,
+        update_profile,
         login,
         logout,
         me
@@ -44,6 +48,7 @@ use modules::shared::AppState;
         CompanyResponse,
         RegisterRequest,
         LoginRequest,
+        UpdateProfileRequest,
         UserResponse,
         SessionResponse
     )),
@@ -70,12 +75,15 @@ async fn main() -> anyhow::Result<()> {
         .route("/", get(root))
         .route("/invoices", post(create_invoice))
         .route("/invoices/:id", get(get_invoice))
+        .route("/invoices/:id/pdf", get(get_invoice_pdf))
         .route("/company", post(create_company))
+        .route("/company", get(list_companies))
         .route("/company/me", get(get_my_company))
         .route("/auth/register", post(register))
         .route("/auth/login", post(login))
         .route("/auth/logout", post(logout))
         .route("/auth/me", get(me))
+        .route("/auth/profile", axum::routing::patch(update_profile))
         .merge(SwaggerUi::new("/docs").url("/api-doc/openapi.json", ApiDoc::openapi()))
         .layer(build_cors())
         .with_state(AppState { db });
@@ -109,7 +117,11 @@ fn build_cors() -> CorsLayer {
 
     CorsLayer::new()
         .allow_origin(allowed_origin)
-        .allow_methods(Any)
-        .allow_headers(Any)
+        .allow_methods([
+            axum::http::Method::GET,
+            axum::http::Method::POST,
+            axum::http::Method::PATCH,
+        ])
+        .allow_headers([axum::http::header::CONTENT_TYPE])
         .allow_credentials(true)
 }

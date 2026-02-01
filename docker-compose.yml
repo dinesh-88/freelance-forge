@@ -16,10 +16,34 @@ services:
     container_name: freelance_forge_backend
     env_file:
       - .env
+    environment:
+      FRONTEND_ORIGIN: http://localhost:5173
     ports:
       - "3000:3000"
     depends_on:
       - db
+    volumes:
+      - ./backend/src:/app/src
+      - cargo_registry:/usr/local/cargo/registry
+      - cargo_git:/usr/local/cargo/git
+      - cargo_target:/app/target
+
+#  frontend:
+#    image: node:20-alpine
+#    container_name: freelance_forge_frontend
+#    working_dir: /app
+#    environment:
+#      VITE_API_URL: http://localhost:3000
+#    ports:
+#      - "5173:5173"
+#    volumes:
+#      - ./frontend:/app
+#    command: sh -c "npm install && npm run dev -- --host"
+#    depends_on:
+#      - backend
 
 volumes:
   pgdata:
+  cargo_registry:
+  cargo_git:
+  cargo_target:

@@ -7,6 +7,7 @@ pub struct Model {
     pub id: Uuid,
     pub name: String,
     pub address: String,
+    pub registration_number: String,
     pub created_at: DateTimeUtc,
 }
 

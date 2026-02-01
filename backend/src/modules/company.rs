@@ -16,6 +16,7 @@ use uuid::Uuid;
 pub struct CompanyCreateRequest {
     pub name: String,
     pub address: String,
+    pub registration_number: String,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -23,6 +24,7 @@ pub struct CompanyResponse {
     pub id: Uuid,
     pub name: String,
     pub address: String,
+    pub registration_number: String,
     pub created_at: DateTime<Utc>,
 }
 
@@ -46,6 +48,9 @@ pub async fn create_company(
     if payload.name.trim().is_empty() || payload.address.trim().is_empty() {
         return Err((axum::http::StatusCode::BAD_REQUEST, "Name and address are required".to_string()));
     }
+    if payload.registration_number.trim().is_empty() {
+        return Err((axum::http::StatusCode::BAD_REQUEST, "Registration number is required".to_string()));
+    }
 
     let current_user = require_user(&state, &headers).await?;
 
@@ -53,6 +58,7 @@ pub async fn create_company(
         id: Set(Uuid::new_v4()),
         name: Set(payload.name),
         address: Set(payload.address),
+        registration_number: Set(payload.registration_number),
         created_at: Set(Utc::now()),
     };
 
@@ -72,6 +78,7 @@ pub async fn create_company(
         id: created.id,
         name: created.name,
         address: created.address,
+        registration_number: created.registration_number,
         created_at: created.created_at,
     }))
 }
@@ -106,6 +113,41 @@ pub async fn get_my_company(
         id: company.id,
         name: company.name,
         address: company.address,
+        registration_number: company.registration_number,
         created_at: company.created_at,
     }))
+}
+
+#[utoipa::path(
+    get,
+    path = "/company",
+    responses(
+        (status = 200, description = "Company list", body = [CompanyResponse]),
+        (status = 401, description = "Not authenticated"),
+        (status = 500, description = "Server error")
+    ),
+    tag = "company"
+)]
+pub async fn list_companies(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<CompanyResponse>>, (axum::http::StatusCode, String)> {
+    let _user = require_user(&state, &headers).await?;
+    let companies = company::Entity::find()
+        .all(&state.db)
+        .await
+        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    let response = companies
+        .into_iter()
+        .map(|item| CompanyResponse {
+            id: item.id,
+            name: item.name,
+            address: item.address,
+            registration_number: item.registration_number,
+            created_at: item.created_at,
+        })
+        .collect();
+
+    Ok(Json(response))
 }

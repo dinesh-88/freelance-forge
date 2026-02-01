@@ -30,6 +30,7 @@ docker compose up --build
 
 - Backend: `http://localhost:3000`
 - Postgres: `localhost:5432`
+- Frontend (Vite dev server): `http://localhost:5173`
 
 Migrations run automatically on backend startup.
 
@@ -44,8 +45,24 @@ cd backend
 cargo run
 ```
 
+## Run frontend locally
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Set `VITE_API_URL` in `frontend/.env` if your backend is not running at `http://localhost:3000`.
+
 ## API endpoints
 
 - `GET /` — health check
+- `POST /auth/register` — register + login
+- `POST /auth/login` — login
+- `POST /auth/logout` — logout
+- `GET /auth/me` — current user
+- `POST /company` — create company
+- `GET /company/me` — fetch current company
 - `POST /invoices` — create invoice
 - `GET /invoices/:id` — fetch invoice by UUID

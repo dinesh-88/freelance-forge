@@ -46,6 +46,11 @@ pub struct SessionResponse {
     pub user: UserResponse,
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct UpdateProfileRequest {
+    pub address: Option<String>,
+}
+
 #[utoipa::path(
     post,
     path = "/auth/register",
@@ -212,6 +217,42 @@ pub async fn me(
         address: user.address,
         company_id: user.company_id,
         created_at: user.created_at,
+    }))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/auth/profile",
+    request_body = UpdateProfileRequest,
+    responses(
+        (status = 200, description = "Profile updated", body = UserResponse),
+        (status = 401, description = "Not authenticated"),
+        (status = 500, description = "Server error")
+    ),
+    tag = "auth"
+)]
+pub async fn update_profile(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<UpdateProfileRequest>,
+) -> Result<Json<UserResponse>, (StatusCode, String)> {
+    let current_user = require_user(&state, &headers).await?;
+    let mut active: user::ActiveModel = current_user.into();
+    if let Some(address) = payload.address {
+        active.address = Set(Some(address));
+    }
+
+    let updated = active
+        .update(&state.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(UserResponse {
+        id: updated.id,
+        email: updated.email,
+        address: updated.address,
+        company_id: updated.company_id,
+        created_at: updated.created_at,
     }))
 }
 
