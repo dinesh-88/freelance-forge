@@ -19,6 +19,13 @@ pub struct CompanyCreateRequest {
     pub registration_number: String,
 }
 
+#[derive(Deserialize, ToSchema)]
+pub struct CompanyUpdateRequest {
+    pub name: Option<String>,
+    pub address: Option<String>,
+    pub registration_number: Option<String>,
+}
+
 #[derive(Serialize, ToSchema)]
 pub struct CompanyResponse {
     pub id: Uuid,
@@ -80,6 +87,69 @@ pub async fn create_company(
         address: created.address,
         registration_number: created.registration_number,
         created_at: created.created_at,
+    }))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/company",
+    request_body = CompanyUpdateRequest,
+    responses(
+        (status = 200, description = "Company updated", body = CompanyResponse),
+        (status = 400, description = "Invalid input"),
+        (status = 401, description = "Not authenticated"),
+        (status = 404, description = "Company not found"),
+        (status = 500, description = "Server error")
+    ),
+    tag = "company"
+)]
+pub async fn update_company(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<CompanyUpdateRequest>,
+) -> Result<Json<CompanyResponse>, (axum::http::StatusCode, String)> {
+    let current_user = require_user(&state, &headers).await?;
+    let company_id = current_user
+        .company_id
+        .ok_or_else(|| (axum::http::StatusCode::NOT_FOUND, "Company not found".to_string()))?;
+
+    let existing = company::Entity::find_by_id(company_id)
+        .one(&state.db)
+        .await
+        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| (axum::http::StatusCode::NOT_FOUND, "Company not found".to_string()))?;
+
+    let mut active: company::ActiveModel = existing.into();
+    if let Some(name) = payload.name {
+        if name.trim().is_empty() {
+            return Err((axum::http::StatusCode::BAD_REQUEST, "Name is required".to_string()));
+        }
+        active.name = Set(name);
+    }
+    if let Some(address) = payload.address {
+        if address.trim().is_empty() {
+            return Err((axum::http::StatusCode::BAD_REQUEST, "Address is required".to_string()));
+        }
+        active.address = Set(address);
+    }
+    if let Some(registration_number) = payload.registration_number {
+        if registration_number.trim().is_empty() {
+            return Err((axum::http::StatusCode::BAD_REQUEST, "Registration number is required".to_string()));
+        }
+        active.registration_number = Set(registration_number);
+    }
+
+    let updated = active
+        .update(&state.db)
+        .await
+        .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(CompanyResponse {
+        id: updated.id,
+        name: updated.name,
+        address: updated.address,
+        registration_number: updated.registration_number,
+        created_at: updated.created_at,
     }))
 }
 

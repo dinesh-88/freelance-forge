@@ -16,8 +16,9 @@ use modules::auth::{
     UpdateProfileRequest, UserResponse,
 };
 use modules::company::{
-    __path_create_company, __path_get_my_company, __path_list_companies, create_company,
-    get_my_company, list_companies, CompanyCreateRequest, CompanyResponse,
+    __path_create_company, __path_get_my_company, __path_list_companies, __path_update_company,
+    create_company, get_my_company, list_companies, update_company, CompanyCreateRequest,
+    CompanyResponse, CompanyUpdateRequest,
 };
 use modules::invoices::{
     __path_create_invoice, __path_get_invoice, __path_get_invoice_pdf, __path_list_invoices,
@@ -37,6 +38,7 @@ use modules::shared::AppState;
         update_invoice,
         get_invoice_pdf,
         create_company,
+        update_company,
         get_my_company,
         list_companies,
         register,
@@ -52,6 +54,7 @@ use modules::shared::AppState;
         InvoiceResponse,
         UpdateInvoiceRequest,
         CompanyCreateRequest,
+        CompanyUpdateRequest,
         CompanyResponse,
         RegisterRequest,
         LoginRequest,
@@ -86,6 +89,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/invoices/:id", axum::routing::patch(update_invoice))
         .route("/invoices/:id/pdf", get(get_invoice_pdf))
         .route("/company", post(create_company))
+        .route("/company", axum::routing::patch(update_company))
         .route("/company", get(list_companies))
         .route("/company/me", get(get_my_company))
         .route("/auth/register", post(register))

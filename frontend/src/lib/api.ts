@@ -94,6 +94,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  updateCompany: (payload: {
+    name?: string;
+    address?: string;
+    registration_number?: string;
+  }) =>
+    fetchJson<Company>("/company", {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
   createInvoice: (payload: {
     client_name: string;
     client_address: string;
