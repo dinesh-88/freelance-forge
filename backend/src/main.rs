@@ -4,6 +4,7 @@ use sea_orm::Database;
 use std::net::SocketAddr;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
+use tower_http::cors::{Any, CorsLayer};
 
 mod entity;
 mod migration;
@@ -76,6 +77,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/auth/logout", post(logout))
         .route("/auth/me", get(me))
         .merge(SwaggerUi::new("/docs").url("/api-doc/openapi.json", ApiDoc::openapi()))
+        .layer(build_cors())
         .with_state(AppState { db });
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
@@ -96,4 +98,18 @@ async fn main() -> anyhow::Result<()> {
 )]
 async fn root() -> &'static str {
     "📋 Freelance Forge API is live"
+}
+
+fn build_cors() -> CorsLayer {
+    let origin = std::env::var("FRONTEND_ORIGIN")
+        .unwrap_or_else(|_| "http://localhost:5173".to_string());
+    let allowed_origin = origin
+        .parse::<axum::http::HeaderValue>()
+        .unwrap_or_else(|_| axum::http::HeaderValue::from_static("http://localhost:5173"));
+
+    CorsLayer::new()
+        .allow_origin(allowed_origin)
+        .allow_methods(Any)
+        .allow_headers(Any)
+        .allow_credentials(true)
 }

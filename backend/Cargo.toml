@@ -18,3 +18,4 @@ anyhow = "1"
 utoipa = { version = "4.2", features = ["axum_extras", "chrono", "uuid"] }
 utoipa-swagger-ui = { version = "7", features = ["axum"] }
 argon2 = "0.5"
+tower-http = { version = "0.5", features = ["cors"] }
