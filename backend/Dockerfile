@@ -16,6 +16,8 @@ COPY Cargo.toml ./
 # If a lockfile exists, copy it for better caching
 COPY Cargo.lock* ./
 
+# Provide a dummy target so cargo can resolve dependencies without full source
+RUN mkdir -p src && echo "fn main() {}" > src/main.rs
 RUN cargo fetch
 
 # Build

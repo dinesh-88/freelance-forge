@@ -55,9 +55,8 @@ async fn main() -> anyhow::Result<()> {
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("🚀 Running at http://{}", addr);
-    axum::Server::bind(&addr)
-        .serve(app.into_make_service())
-        .await?;
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    axum::serve(listener, app).await?;
 
     Ok(())
 }
@@ -70,7 +69,7 @@ async fn create_invoice(
     State(state): State<AppState>,
     Json(payload): Json<NewInvoice>,
 ) -> Result<Json<InvoiceResponse>, (axum::http::StatusCode, String)> {
-    let active = entity::invoice::ActiveModel {
+    let active = entity::ActiveModel {
         id: Set(Uuid::new_v4()),
         client_name: Set(payload.client_name),
         description: Set(payload.description),
@@ -101,8 +100,8 @@ async fn get_invoice(
     let id = Uuid::parse_str(&id)
         .map_err(|_| (axum::http::StatusCode::BAD_REQUEST, "Invalid id".to_string()))?;
 
-    let invoice = entity::invoice::Entity::find()
-        .filter(entity::invoice::Column::Id.eq(id))
+    let invoice = entity::Entity::find()
+        .filter(entity::Column::Id.eq(id))
         .one(&state.db)
         .await
         .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
@@ -121,7 +120,7 @@ async fn get_invoice(
 mod entity {
     use sea_orm::entity::prelude::*;
 
-    #[derive(Clone, Debug, PartialEq, DeriveEntityModel, Eq)]
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
     #[sea_orm(table_name = "invoices")]
     pub struct Model {
         #[sea_orm(primary_key)]
