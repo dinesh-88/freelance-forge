@@ -1,18 +1,15 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "invoice")]
+#[sea_orm(table_name = "invoice_line_item")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
-    pub client_name: String,
-    pub client_address: String,
+    pub invoice_id: Uuid,
     pub description: String,
-    pub amount: f64,
-    pub currency: String,
-    pub user_address: String,
-    pub total_amount: f64,
-    pub date: Date,
+    pub quantity: f64,
+    pub unit_price: f64,
+    pub line_total: f64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

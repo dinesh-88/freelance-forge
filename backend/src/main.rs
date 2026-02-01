@@ -20,8 +20,10 @@ use modules::company::{
     get_my_company, list_companies, CompanyCreateRequest, CompanyResponse,
 };
 use modules::invoices::{
-    __path_create_invoice, __path_get_invoice, __path_get_invoice_pdf, create_invoice, get_invoice,
-    get_invoice_pdf, InvoiceResponse, NewInvoice,
+    __path_create_invoice, __path_get_invoice, __path_get_invoice_pdf, __path_list_invoices,
+    __path_update_invoice, create_invoice, get_invoice, get_invoice_pdf, list_invoices,
+    update_invoice, InvoiceResponse, LineItemInput, LineItemResponse, NewInvoice,
+    UpdateInvoiceRequest,
 };
 use modules::shared::AppState;
 
@@ -30,7 +32,9 @@ use modules::shared::AppState;
     paths(
         root,
         create_invoice,
+        list_invoices,
         get_invoice,
+        update_invoice,
         get_invoice_pdf,
         create_company,
         get_my_company,
@@ -43,7 +47,10 @@ use modules::shared::AppState;
     ),
     components(schemas(
         NewInvoice,
+        LineItemInput,
+        LineItemResponse,
         InvoiceResponse,
+        UpdateInvoiceRequest,
         CompanyCreateRequest,
         CompanyResponse,
         RegisterRequest,
@@ -74,7 +81,9 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         .route("/", get(root))
         .route("/invoices", post(create_invoice))
+        .route("/invoices", get(list_invoices))
         .route("/invoices/:id", get(get_invoice))
+        .route("/invoices/:id", axum::routing::patch(update_invoice))
         .route("/invoices/:id/pdf", get(get_invoice_pdf))
         .route("/company", post(create_company))
         .route("/company", get(list_companies))

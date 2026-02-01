@@ -17,13 +17,23 @@ export type Company = {
 export type Invoice = {
   id: string;
   client_name: string;
+  client_address: string;
   description: string;
   amount: number;
   currency: string;
   user_address: string;
+  total_amount: number;
   date: string;
+  items: LineItem[];
 };
 
+export type LineItem = {
+  id?: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  line_total?: number;
+};
 type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:3000";
@@ -86,13 +96,36 @@ export const api = {
     }),
   createInvoice: (payload: {
     client_name: string;
-    description: string;
-    amount: number;
+    client_address: string;
     currency: string;
     date: string;
+    items: Array<{
+      description: string;
+      quantity: number;
+      unit_price: number;
+    }>;
   }) =>
     fetchJson<Invoice>("/invoices", {
       method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  listInvoices: () => fetchJson<Invoice[]>("/invoices"),
+  updateInvoice: (
+    id: string,
+    payload: Partial<{
+      client_name: string;
+      client_address: string;
+      currency: string;
+      date: string;
+      items: Array<{
+        description: string;
+        quantity: number;
+        unit_price: number;
+      }>;
+    }>
+  ) =>
+    fetchJson<Invoice>(`/invoices/${id}`, {
+      method: "PATCH",
       body: JSON.stringify(payload),
     }),
   getInvoice: (id: string) => fetchJson<Invoice>(`/invoices/${id}`),
