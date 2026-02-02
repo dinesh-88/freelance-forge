@@ -1,3 +1,5 @@
+import { Link, useLocation } from "react-router-dom";
+
 export type DashboardSection = "profile" | "company" | "invoices" | null;
 
 export default function DashboardNav({
@@ -7,11 +9,13 @@ export default function DashboardNav({
   activeSection: DashboardSection;
   onSelect: (section: Exclude<DashboardSection, null>) => void;
 }) {
+  const location = useLocation();
   const sections: Array<[Exclude<DashboardSection, null>, string]> = [
     ["profile", "Profile"],
     ["company", "Company"],
     ["invoices", "Invoices"],
   ];
+  const isTemplates = location.pathname.startsWith("/app/templates");
 
   return (
     <nav className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm text-slate shadow-lift">
@@ -27,6 +31,14 @@ export default function DashboardNav({
           {label}
         </button>
       ))}
+      <Link
+        className={`rounded-full px-3 py-1 transition ${
+          isTemplates ? "bg-ink text-white" : "hover:bg-ink/10"
+        }`}
+        to="/app/templates"
+      >
+        Templates
+      </Link>
     </nav>
   );
 }

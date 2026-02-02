@@ -10,6 +10,7 @@ pub struct Model {
     pub quantity: f64,
     pub unit_price: f64,
     pub line_total: f64,
+    pub use_quantity: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

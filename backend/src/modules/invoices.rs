@@ -1,4 +1,4 @@
-use crate::entity::{invoice, invoice_line_item};
+use crate::entity::{company, invoice, invoice_line_item, invoice_template};
 use crate::modules::auth::require_user;
 use crate::modules::shared::AppState;
 use axum::{
@@ -14,11 +14,15 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
-use printpdf::{BuiltinFont, Mm, PdfDocument};
-use std::io::{BufWriter, Cursor};
+use std::io::Write;
+use std::process::{Command, Stdio};
+use handlebars::Handlebars;
+use serde_json::json;
 
 #[derive(Deserialize, ToSchema)]
 pub struct NewInvoice {
+    pub company_id: Uuid,
+    pub template_id: Option<Uuid>,
     pub client_name: String,
     pub client_address: String,
     pub currency: String,
@@ -31,6 +35,7 @@ pub struct LineItemInput {
     pub description: String,
     pub quantity: f64,
     pub unit_price: f64,
+    pub use_quantity: Option<bool>,
 }
 
 #[derive(Serialize, ToSchema)]
@@ -40,11 +45,15 @@ pub struct LineItemResponse {
     pub quantity: f64,
     pub unit_price: f64,
     pub line_total: f64,
+    pub use_quantity: bool,
 }
 
 #[derive(Serialize, ToSchema)]
 pub struct InvoiceResponse {
     pub id: Uuid,
+    pub company_id: Option<Uuid>,
+    pub user_id: Option<Uuid>,
+    pub template_id: Option<Uuid>,
     pub client_name: String,
     pub client_address: String,
     pub description: String,
@@ -58,6 +67,8 @@ pub struct InvoiceResponse {
 
 #[derive(Deserialize, ToSchema)]
 pub struct UpdateInvoiceRequest {
+    pub company_id: Option<Uuid>,
+    pub template_id: Option<Uuid>,
     pub client_name: Option<String>,
     pub client_address: Option<String>,
     pub description: Option<String>,
@@ -65,6 +76,19 @@ pub struct UpdateInvoiceRequest {
     pub currency: Option<String>,
     pub date: Option<NaiveDate>,
     pub items: Option<Vec<LineItemInput>>,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct TemplateCreateRequest {
+    pub name: String,
+    pub html: String,
+}
+
+#[derive(Serialize, ToSchema)]
+pub struct TemplateResponse {
+    pub id: Uuid,
+    pub name: String,
+    pub html: String,
 }
 
 #[utoipa::path(
@@ -91,14 +115,23 @@ pub async fn create_invoice(
         return Err((StatusCode::BAD_REQUEST, "At least one line item is required".to_string()));
     }
 
-    if payload.client_address.trim().is_empty() {
-        return Err((StatusCode::BAD_REQUEST, "Client address is required".to_string()));
-    }
+    let company = company::Entity::find_by_id(payload.company_id)
+        .filter(company::Column::UserId.eq(user.id))
+        .one(&state.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| (StatusCode::BAD_REQUEST, "Invalid company".to_string()))?;
 
     let total_amount = payload
         .items
         .iter()
-        .map(|item| item.quantity * item.unit_price)
+        .map(|item| {
+            if item.use_quantity.unwrap_or(true) {
+                item.quantity * item.unit_price
+            } else {
+                item.unit_price
+            }
+        })
         .sum::<f64>();
 
     let description = payload
@@ -113,10 +146,15 @@ pub async fn create_invoice(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
+    let template_id = resolve_template_id(&state.db, user.id, payload.template_id).await?;
+
     let active = invoice::ActiveModel {
         id: Set(Uuid::new_v4()),
-        client_name: Set(payload.client_name),
-        client_address: Set(payload.client_address),
+        user_id: Set(Some(user.id)),
+        company_id: Set(Some(company.id)),
+        template_id: Set(template_id),
+        client_name: Set(company.name.clone()),
+        client_address: Set(company.address.clone()),
         description: Set(description),
         amount: Set(total_amount),
         currency: Set(payload.currency),
@@ -132,7 +170,12 @@ pub async fn create_invoice(
 
     let mut items_response = Vec::with_capacity(payload.items.len());
     for item in payload.items {
-        let line_total = item.quantity * item.unit_price;
+        let use_quantity = item.use_quantity.unwrap_or(true);
+        let line_total = if use_quantity {
+            item.quantity * item.unit_price
+        } else {
+            item.unit_price
+        };
         let active_item = invoice_line_item::ActiveModel {
             id: Set(Uuid::new_v4()),
             invoice_id: Set(created.id),
@@ -140,6 +183,7 @@ pub async fn create_invoice(
             quantity: Set(item.quantity),
             unit_price: Set(item.unit_price),
             line_total: Set(line_total),
+            use_quantity: Set(use_quantity),
         };
         let saved = active_item
             .insert(&txn)
@@ -151,6 +195,7 @@ pub async fn create_invoice(
             quantity: saved.quantity,
             unit_price: saved.unit_price,
             line_total: saved.line_total,
+            use_quantity: saved.use_quantity,
         });
     }
 
@@ -160,6 +205,9 @@ pub async fn create_invoice(
 
     Ok(Json(InvoiceResponse {
         id: created.id,
+        company_id: created.company_id,
+        user_id: created.user_id,
+        template_id: created.template_id,
         client_name: created.client_name,
         client_address: created.client_address,
         description: created.description,
@@ -186,8 +234,9 @@ pub async fn list_invoices(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<InvoiceResponse>>, (StatusCode, String)> {
-    let _user = require_user(&state, &headers).await?;
+    let current_user = require_user(&state, &headers).await?;
     let invoices = invoice::Entity::find()
+        .filter(invoice::Column::UserId.eq(current_user.id))
         .all(&state.db)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -197,6 +246,9 @@ pub async fn list_invoices(
         let items = load_items(&state.db, item.id).await?;
         response.push(InvoiceResponse {
             id: item.id,
+            company_id: item.company_id,
+            user_id: item.user_id,
+            template_id: item.template_id,
             client_name: item.client_name,
             client_address: item.client_address,
             description: item.description,
@@ -232,12 +284,13 @@ pub async fn get_invoice(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<Json<InvoiceResponse>, (axum::http::StatusCode, String)> {
-    let _user = require_user(&state, &headers).await?;
+    let current_user = require_user(&state, &headers).await?;
     let id = Uuid::parse_str(&id)
         .map_err(|_| (axum::http::StatusCode::BAD_REQUEST, "Invalid id".to_string()))?;
 
     let invoice = invoice::Entity::find()
         .filter(invoice::Column::Id.eq(id))
+        .filter(invoice::Column::UserId.eq(current_user.id))
         .one(&state.db)
         .await
         .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
@@ -246,6 +299,9 @@ pub async fn get_invoice(
     let items = load_items(&state.db, invoice.id).await?;
     Ok(Json(InvoiceResponse {
         id: invoice.id,
+        company_id: invoice.company_id,
+        user_id: invoice.user_id,
+        template_id: invoice.template_id,
         client_name: invoice.client_name,
         client_address: invoice.client_address,
         description: invoice.description,
@@ -280,12 +336,13 @@ pub async fn update_invoice(
     Path(id): Path<String>,
     Json(payload): Json<UpdateInvoiceRequest>,
 ) -> Result<Json<InvoiceResponse>, (StatusCode, String)> {
-    let _user = require_user(&state, &headers).await?;
+    let current_user = require_user(&state, &headers).await?;
     let id = Uuid::parse_str(&id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid id".to_string()))?;
 
     let existing = invoice::Entity::find()
         .filter(invoice::Column::Id.eq(id))
+        .filter(invoice::Column::UserId.eq(current_user.id))
         .one(&state.db)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
@@ -297,6 +354,21 @@ pub async fn update_invoice(
     }
     if let Some(client_address) = payload.client_address {
         active.client_address = Set(client_address);
+    }
+    if let Some(company_id) = payload.company_id {
+        let company = company::Entity::find_by_id(company_id)
+            .filter(company::Column::UserId.eq(current_user.id))
+            .one(&state.db)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .ok_or_else(|| (StatusCode::BAD_REQUEST, "Invalid company".to_string()))?;
+        active.company_id = Set(Some(company.id));
+        active.client_name = Set(company.name);
+        active.client_address = Set(company.address);
+    }
+    if let Some(template_id) = payload.template_id {
+        let resolved = resolve_template_id(&state.db, current_user.id, Some(template_id)).await?;
+        active.template_id = Set(resolved);
     }
     if let Some(description) = payload.description {
         active.description = Set(description);
@@ -317,7 +389,13 @@ pub async fn update_invoice(
         }
         let total_amount = items
             .iter()
-            .map(|item| item.quantity * item.unit_price)
+            .map(|item| {
+                if item.use_quantity.unwrap_or(true) {
+                    item.quantity * item.unit_price
+                } else {
+                    item.unit_price
+                }
+            })
             .sum::<f64>();
         active.amount = Set(total_amount);
         active.total_amount = Set(total_amount);
@@ -344,7 +422,12 @@ pub async fn update_invoice(
 
         let mut items_response = Vec::with_capacity(items.len());
         for item in items {
-            let line_total = item.quantity * item.unit_price;
+            let use_quantity = item.use_quantity.unwrap_or(true);
+            let line_total = if use_quantity {
+                item.quantity * item.unit_price
+            } else {
+                item.unit_price
+            };
             let active_item = invoice_line_item::ActiveModel {
                 id: Set(Uuid::new_v4()),
                 invoice_id: Set(updated.id),
@@ -352,6 +435,7 @@ pub async fn update_invoice(
                 quantity: Set(item.quantity),
                 unit_price: Set(item.unit_price),
                 line_total: Set(line_total),
+                use_quantity: Set(use_quantity),
             };
             let saved = active_item
                 .insert(&txn)
@@ -363,6 +447,7 @@ pub async fn update_invoice(
                 quantity: saved.quantity,
                 unit_price: saved.unit_price,
                 line_total: saved.line_total,
+                use_quantity: saved.use_quantity,
             });
         }
 
@@ -372,6 +457,9 @@ pub async fn update_invoice(
 
         return Ok(Json(InvoiceResponse {
             id: updated.id,
+            company_id: updated.company_id,
+            user_id: updated.user_id,
+            template_id: updated.template_id,
             client_name: updated.client_name,
             client_address: updated.client_address,
             description: updated.description,
@@ -393,6 +481,9 @@ pub async fn update_invoice(
 
     Ok(Json(InvoiceResponse {
         id: updated.id,
+        company_id: updated.company_id,
+        user_id: updated.user_id,
+        template_id: updated.template_id,
         client_name: updated.client_name,
         client_address: updated.client_address,
         description: updated.description,
@@ -425,19 +516,21 @@ pub async fn get_invoice_pdf(
     headers: HeaderMap,
     Path(id): Path<String>,
 ) -> Result<Response, (StatusCode, String)> {
-    let _user = require_user(&state, &headers).await?;
+    let current_user = require_user(&state, &headers).await?;
     let id = Uuid::parse_str(&id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid id".to_string()))?;
 
     let invoice = invoice::Entity::find()
         .filter(invoice::Column::Id.eq(id))
+        .filter(invoice::Column::UserId.eq(current_user.id))
         .one(&state.db)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or_else(|| (StatusCode::NOT_FOUND, "Invoice not found".to_string()))?;
 
     let items = load_items(&state.db, invoice.id).await?;
-    let pdf_bytes = build_invoice_pdf(&invoice, &items)
+    let template = load_template(&state.db, invoice.user_id, invoice.template_id).await?;
+    let pdf_bytes = build_invoice_pdf(&invoice, &items, &template)
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e))?;
 
     let mut response_headers = HeaderMap::new();
@@ -454,160 +547,432 @@ pub async fn get_invoice_pdf(
     Ok((response_headers, pdf_bytes).into_response())
 }
 
+#[utoipa::path(
+    get,
+    path = "/invoice-templates",
+    responses(
+        (status = 200, description = "Template list", body = [TemplateResponse]),
+        (status = 401, description = "Not authenticated"),
+        (status = 500, description = "Server error")
+    ),
+    tag = "invoices"
+)]
+pub async fn list_templates(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<Vec<TemplateResponse>>, (StatusCode, String)> {
+    let current_user = require_user(&state, &headers).await?;
+    let templates = invoice_template::Entity::find()
+        .filter(invoice_template::Column::UserId.eq(current_user.id))
+        .all(&state.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(
+        templates
+            .into_iter()
+            .map(|item| TemplateResponse {
+                id: item.id,
+                name: item.name,
+                html: item.html,
+            })
+            .collect(),
+    ))
+}
+
+#[utoipa::path(
+    post,
+    path = "/invoice-templates",
+    request_body = TemplateCreateRequest,
+    responses(
+        (status = 200, description = "Template created", body = TemplateResponse),
+        (status = 400, description = "Invalid input"),
+        (status = 401, description = "Not authenticated"),
+        (status = 500, description = "Server error")
+    ),
+    tag = "invoices"
+)]
+pub async fn create_template(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(payload): Json<TemplateCreateRequest>,
+) -> Result<Json<TemplateResponse>, (StatusCode, String)> {
+    let current_user = require_user(&state, &headers).await?;
+    if payload.name.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "Name is required".to_string()));
+    }
+
+    let active = invoice_template::ActiveModel {
+        id: Set(Uuid::new_v4()),
+        user_id: Set(current_user.id),
+        name: Set(payload.name),
+        html: Set(payload.html),
+        created_at: Set(chrono::Utc::now()),
+    };
+
+    let created = active
+        .insert(&state.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(TemplateResponse {
+        id: created.id,
+        name: created.name,
+        html: created.html,
+    }))
+}
+
+#[utoipa::path(
+    patch,
+    path = "/invoice-templates/{id}",
+    request_body = TemplateCreateRequest,
+    responses(
+        (status = 200, description = "Template updated", body = TemplateResponse),
+        (status = 400, description = "Invalid input"),
+        (status = 401, description = "Not authenticated"),
+        (status = 404, description = "Template not found"),
+        (status = 500, description = "Server error")
+    ),
+    tag = "invoices"
+)]
+pub async fn update_template(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(payload): Json<TemplateCreateRequest>,
+) -> Result<Json<TemplateResponse>, (StatusCode, String)> {
+    let current_user = require_user(&state, &headers).await?;
+    let id = Uuid::parse_str(&id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid id".to_string()))?;
+    let existing = invoice_template::Entity::find_by_id(id)
+        .filter(invoice_template::Column::UserId.eq(current_user.id))
+        .one(&state.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, "Template not found".to_string()))?;
+
+    if payload.name.trim().is_empty() {
+        return Err((StatusCode::BAD_REQUEST, "Name is required".to_string()));
+    }
+
+    let mut active: invoice_template::ActiveModel = existing.into();
+    active.name = Set(payload.name);
+    active.html = Set(payload.html);
+
+    let updated = active
+        .update(&state.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(Json(TemplateResponse {
+        id: updated.id,
+        name: updated.name,
+        html: updated.html,
+    }))
+}
+
+#[utoipa::path(
+    delete,
+    path = "/invoice-templates/{id}",
+    responses(
+        (status = 204, description = "Template deleted"),
+        (status = 401, description = "Not authenticated"),
+        (status = 404, description = "Template not found"),
+        (status = 500, description = "Server error")
+    ),
+    tag = "invoices"
+)]
+pub async fn delete_template(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let current_user = require_user(&state, &headers).await?;
+    let id = Uuid::parse_str(&id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid id".to_string()))?;
+    let existing = invoice_template::Entity::find_by_id(id)
+        .filter(invoice_template::Column::UserId.eq(current_user.id))
+        .one(&state.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        .ok_or_else(|| (StatusCode::NOT_FOUND, "Template not found".to_string()))?;
+
+    invoice_template::Entity::delete_by_id(existing.id)
+        .exec(&state.db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
 fn build_invoice_pdf(
     invoice: &invoice::Model,
     items: &[LineItemResponse],
+    template: &InvoiceTemplateData,
 ) -> Result<Vec<u8>, String> {
-    let (doc, page, layer) = PdfDocument::new("Invoice", Mm(210.0), Mm(297.0), "Layer 1");
-    let mut layer = doc.get_page(page).get_layer(layer);
-    let font_regular = doc
-        .add_builtin_font(BuiltinFont::Helvetica)
-        .map_err(|e| e.to_string())?;
-    let font_bold = doc
-        .add_builtin_font(BuiltinFont::HelveticaBold)
-        .map_err(|e| e.to_string())?;
+    let mut handlebars = Handlebars::new();
+    handlebars.register_escape_fn(|s| s.to_string());
+    let subtotal: f64 = items.iter().map(|item| item.line_total).sum();
+    let invoice_note = "Rechnungsbetrag ohne Umsatzsteuer gemäß § 19 Abs. 1 UStG. (Invoice amount without sales tax according to § 19 paragraph 1 UStG)".to_string();
+    let ctx = json!({
+        "invoice_id": invoice.id.to_string(),
+        "invoice_date": invoice.date.to_string(),
+        "client_name": invoice.client_name,
+        "client_address": invoice.client_address,
+        "user_address": invoice.user_address,
+        "currency": invoice.currency,
+        "total_amount": invoice.total_amount,
+        "subtotal": subtotal,
+        "invoice_note": invoice_note,
+        "items": items.iter().map(|item| {
+            json!({
+                "description": item.description,
+                "quantity": item.quantity,
+                "unit_price": item.unit_price,
+                "line_total": item.line_total,
+                "use_quantity": item.use_quantity,
+            })
+        }).collect::<Vec<_>>(),
+    });
 
-    let left = 20.0f32;
-    let right = 190.0f32;
-    let mut y = 275.0f32;
-
-    // Header
-    layer.use_text("Invoice", 28.0, Mm(left), Mm(y), &font_bold);
-    y -= 12.0;
-    layer.use_text(
-        format!("Invoice ID: {}", invoice.id),
-        10.5,
-        Mm(left),
-        Mm(y),
-        &font_regular,
-    );
-    y -= 8.0;
-    layer.use_text(
-        format!("Date: {}", invoice.date),
-        10.5,
-        Mm(left),
-        Mm(y),
-        &font_regular,
-    );
-
-    // Client block
-    y -= 16.0;
-    layer.use_text("Bill To", 12.0, Mm(left), Mm(y), &font_bold);
-    y -= 7.0;
-    layer.use_text(
-        invoice.client_name.clone(),
-        11.0,
-        Mm(left),
-        Mm(y),
-        &font_regular,
-    );
-    y -= 6.5;
-    layer.use_text(
-        invoice.client_address.clone(),
-        10.0,
-        Mm(left),
-        Mm(y),
-        &font_regular,
-    );
-
-    // Description + amount row
-    y -= 18.0;
-    layer.use_text("Description", 11.0, Mm(left), Mm(y), &font_bold);
-    layer.use_text("Qty", 11.0, Mm(right - 70.0), Mm(y), &font_bold);
-    layer.use_text("Unit", 11.0, Mm(right - 50.0), Mm(y), &font_bold);
-    layer.use_text("Total", 11.0, Mm(right - 25.0), Mm(y), &font_bold);
-    y -= 8.0;
-
-    for item in items {
-        if y < 40.0 {
-            let (page, layer_ref) = doc.add_page(Mm(210.0), Mm(297.0), "Layer");
-            let next_layer = doc.get_page(page).get_layer(layer_ref);
-            y = 275.0;
-            next_layer.use_text("Invoice (cont.)", 18.0, Mm(left), Mm(y), &font_bold);
-            y -= 12.0;
-            next_layer.use_text(
-                format!("Invoice ID: {}", invoice.id),
-                10.0,
-                Mm(left),
-                Mm(y),
-                &font_regular,
-            );
-            y -= 12.0;
-            next_layer.use_text("Description", 11.0, Mm(left), Mm(y), &font_bold);
-            next_layer.use_text("Qty", 11.0, Mm(right - 70.0), Mm(y), &font_bold);
-            next_layer.use_text("Unit", 11.0, Mm(right - 50.0), Mm(y), &font_bold);
-            next_layer.use_text("Total", 11.0, Mm(right - 25.0), Mm(y), &font_bold);
-            y -= 8.0;
-            y -= 2.0;
-            for_item_row(&next_layer, &font_regular, &font_bold, left, right, &mut y, item, &invoice.currency);
-            layer = next_layer;
-            continue;
+    let render = |input: &str| -> String {
+        if input.trim().is_empty() {
+            return String::new();
         }
-        for_item_row(&layer, &font_regular, &font_bold, left, right, &mut y, item, &invoice.currency);
+        handlebars
+            .render_template(input, &ctx)
+            .unwrap_or_else(|_| input.to_string())
+    };
+
+    let html = if template.is_custom {
+        let template_html = render(&template.html);
+        format!(
+            r#"<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body {{ font-family: "DejaVu Sans", Arial, sans-serif; color: #222; margin: 32px; }}
+    h1, h2, h3 {{ margin: 0 0 8px; }}
+    .section {{ margin-bottom: 18px; }}
+    table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
+    th, td {{ border-bottom: 1px solid #ddd; padding: 6px 4px; text-align: left; }}
+    th {{ font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }}
+    .right {{ text-align: right; }}
+  </style>
+</head>
+<body>
+  {}
+</body>
+</html>"#,
+            template_html
+        )
+    } else {
+        let html_template = format!(
+            r#"<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body {{ font-family: "DejaVu Sans", Arial, sans-serif; color: #222; margin: 32px; }}
+    h1 {{ margin: 0 0 8px; }}
+    h2 {{ margin: 0 0 6px; font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; }}
+    .row {{ display: flex; justify-content: space-between; gap: 12px; }}
+    .section {{ margin-bottom: 18px; }}
+    .muted {{ color: #666; font-size: 12px; }}
+    table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
+    th, td {{ border-bottom: 1px solid #ddd; padding: 6px 4px; text-align: left; }}
+    th {{ font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }}
+    .right {{ text-align: right; }}
+    .totals {{ margin-top: 10px; text-align: right; font-weight: bold; }}
+  </style>
+</head>
+<body>
+  <div class="section">
+    <h1>Invoice</h1>
+    <div class="muted">{}</div>
+    <div class="row muted" style="margin-top:6px;">
+      <div>Invoice ID: {}</div>
+      <div>Date: {}</div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Bill To</h2>
+    <div>{}</div>
+    <div class="muted">{}</div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Description</th>
+        <th class="right">Qty</th>
+        <th class="right">Unit</th>
+        <th class="right">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each items}}
+      <tr>
+        <td>{{description}}</td>
+        <td class="right">{{quantity}}</td>
+        <td class="right">{{unit_price}}</td>
+        <td class="right">{{currency}} {{line_total}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+
+  <div class="totals">
+    Subtotal: {{currency}} {{subtotal}}<br/>
+    Total: {{currency}} {{total_amount}}
+  </div>
+
+  <div class="section" style="margin-top:18px;">
+    <h2>Notes</h2>
+    <div class="muted">{{invoice_note}}</div>
+  </div>
+</body>
+</html>"#,
+            invoice.user_address,
+            invoice.id,
+            invoice.date,
+            invoice.client_name,
+            invoice.client_address
+        );
+        handlebars
+            .render_template(&html_template, &ctx)
+            .unwrap_or_else(|_| html_template)
+    };
+
+    let mut child = Command::new("wkhtmltopdf")
+        .args(["-q", "-", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("wkhtmltopdf failed to start: {}", e))?;
+
+    if let Some(stdin) = child.stdin.as_mut() {
+        stdin
+            .write_all(html.as_bytes())
+            .map_err(|e| format!("wkhtmltopdf stdin write failed: {}", e))?;
     }
 
-    // Total row
-    y -= 6.0;
-    layer.use_text("Total", 11.0, Mm(right - 25.0), Mm(y), &font_bold);
-    layer.use_text(
-        format!("{} {:.2}", invoice.currency, invoice.total_amount),
-        11.0,
-        Mm(right - 25.0),
-        Mm(y - 6.0),
-        &font_bold,
-    );
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("wkhtmltopdf failed: {}", e))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).to_string());
+    }
 
-    // Footer
-    y -= 20.0;
-    layer.use_text("Notes", 10.0, Mm(left), Mm(y), &font_bold);
-    y -= 6.0;
-    layer.use_text(
-        "Thank you for your business.",
-        9.5,
-        Mm(left),
-        Mm(y),
-        &font_regular,
-    );
-
-    let mut buffer = BufWriter::new(Cursor::new(Vec::new()));
-    doc.save(&mut buffer).map_err(|e| e.to_string())?;
-    let cursor = buffer.into_inner().map_err(|e| e.to_string())?;
-    Ok(cursor.into_inner())
+    Ok(output.stdout)
 }
 
-fn for_item_row(
-    layer: &printpdf::PdfLayerReference,
-    font_regular: &printpdf::IndirectFontRef,
-    font_bold: &printpdf::IndirectFontRef,
-    left: f32,
-    right: f32,
-    y: &mut f32,
-    item: &LineItemResponse,
-    currency: &str,
-) {
-    layer.use_text(&item.description, 10.0, Mm(left), Mm(*y), font_regular);
-    layer.use_text(
-        format!("{:.2}", item.quantity),
-        10.0,
-        Mm(right - 70.0),
-        Mm(*y),
-        font_regular,
-    );
-    layer.use_text(
-        format!("{:.2}", item.unit_price),
-        10.0,
-        Mm(right - 50.0),
-        Mm(*y),
-        font_regular,
-    );
-    layer.use_text(
-        format!("{} {:.2}", currency, item.line_total),
-        10.5,
-        Mm(right - 25.0),
-        Mm(*y),
-        font_bold,
-    );
-    *y -= 8.0;
+#[derive(Clone)]
+struct InvoiceTemplateData {
+    html: String,
+    is_custom: bool,
+}
+
+async fn resolve_template_id(
+    db: &sea_orm::DatabaseConnection,
+    user_id: Uuid,
+    template_id: Option<Uuid>,
+) -> Result<Option<Uuid>, (StatusCode, String)> {
+    if let Some(id) = template_id {
+        let exists = invoice_template::Entity::find_by_id(id)
+            .filter(invoice_template::Column::UserId.eq(user_id))
+            .one(db)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+            .is_some();
+        if !exists {
+            return Err((StatusCode::BAD_REQUEST, "Invalid template".to_string()));
+        }
+        return Ok(Some(id));
+    }
+    Ok(None)
+}
+
+async fn load_template(
+    db: &sea_orm::DatabaseConnection,
+    user_id: Option<Uuid>,
+    template_id: Option<Uuid>,
+) -> Result<InvoiceTemplateData, (StatusCode, String)> {
+    let default_note = "Rechnungsbetrag ohne Umsatzsteuer gemäß § 19 Abs. 1 UStG. (Invoice amount without sales tax according to § 19 paragraph 1 UStG)".to_string();
+    let Some(user_id) = user_id else {
+        return Ok(default_template(default_note));
+    };
+    if let Some(id) = template_id {
+        if let Some(template) = invoice_template::Entity::find_by_id(id)
+            .filter(invoice_template::Column::UserId.eq(user_id))
+            .one(db)
+            .await
+            .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
+        {
+            return Ok(InvoiceTemplateData {
+                html: template.html,
+                is_custom: true,
+            });
+        }
+    }
+    Ok(default_template(default_note))
+}
+
+fn default_template(note: String) -> InvoiceTemplateData {
+    InvoiceTemplateData {
+        html: format!(
+            r#"<div class="section">
+  <h1>Invoice</h1>
+  <div class="muted">{{{{user_address}}}}</div>
+  <div class="row muted" style="margin-top:6px;">
+    <div>Invoice ID: {{{{invoice_id}}}}</div>
+    <div>Date: {{{{invoice_date}}}}</div>
+  </div>
+</div>
+
+<div class="section">
+  <h2>Bill To</h2>
+  <div>{{{{client_name}}}}</div>
+  <div class="muted">{{{{client_address}}}}</div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Description</th>
+      <th class="right">Qty</th>
+      <th class="right">Unit</th>
+      <th class="right">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{{{#each items}}}}
+    <tr>
+      <td>{{{{description}}}}</td>
+      <td class="right">{{{{quantity}}}}</td>
+      <td class="right">{{{{unit_price}}}}</td>
+      <td class="right">{{{{currency}}}} {{{{line_total}}}}</td>
+    </tr>
+    {{{{/each}}}}
+  </tbody>
+</table>
+
+<div class="totals">
+  Subtotal: {{{{currency}}}} {{{{subtotal}}}}<br/>
+  Total: {{{{currency}}}} {{{{total_amount}}}}
+</div>
+
+<div class="section" style="margin-top:18px;">
+  <h2>Notes</h2>
+  <div class="muted">{}</div>
+</div>"#,
+            note
+        ),
+        is_custom: false,
+    }
 }
 
 async fn load_items(
@@ -628,6 +993,7 @@ async fn load_items(
             quantity: item.quantity,
             unit_price: item.unit_price,
             line_total: item.line_total,
+            use_quantity: item.use_quantity,
         })
         .collect())
 }

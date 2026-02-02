@@ -22,9 +22,11 @@ use modules::company::{
 };
 use modules::invoices::{
     __path_create_invoice, __path_get_invoice, __path_get_invoice_pdf, __path_list_invoices,
-    __path_update_invoice, create_invoice, get_invoice, get_invoice_pdf, list_invoices,
-    update_invoice, InvoiceResponse, LineItemInput, LineItemResponse, NewInvoice,
-    UpdateInvoiceRequest,
+    __path_update_invoice, __path_create_template, __path_list_templates, __path_update_template,
+    __path_delete_template, create_invoice, create_template, delete_template, get_invoice,
+    get_invoice_pdf, list_invoices, list_templates, update_invoice, update_template,
+    InvoiceResponse, LineItemInput, LineItemResponse, NewInvoice, TemplateCreateRequest,
+    TemplateResponse, UpdateInvoiceRequest,
 };
 use modules::shared::AppState;
 
@@ -37,6 +39,10 @@ use modules::shared::AppState;
         get_invoice,
         update_invoice,
         get_invoice_pdf,
+        list_templates,
+        create_template,
+        update_template,
+        delete_template,
         create_company,
         update_company,
         get_my_company,
@@ -53,6 +59,8 @@ use modules::shared::AppState;
         LineItemResponse,
         InvoiceResponse,
         UpdateInvoiceRequest,
+        TemplateCreateRequest,
+        TemplateResponse,
         CompanyCreateRequest,
         CompanyUpdateRequest,
         CompanyResponse,
@@ -88,6 +96,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/invoices/:id", get(get_invoice))
         .route("/invoices/:id", axum::routing::patch(update_invoice))
         .route("/invoices/:id/pdf", get(get_invoice_pdf))
+        .route("/invoice-templates", get(list_templates))
+        .route("/invoice-templates", post(create_template))
+        .route("/invoice-templates/:id", axum::routing::patch(update_template))
+        .route("/invoice-templates/:id", axum::routing::delete(delete_template))
         .route("/company", post(create_company))
         .route("/company", axum::routing::patch(update_company))
         .route("/company", get(list_companies))

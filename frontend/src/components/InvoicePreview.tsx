@@ -30,8 +30,15 @@ export default function InvoicePreview({
                 <div key={row.id || row.description} className="flex items-center justify-between">
                   <span>{row.description}</span>
                   <span>
-                    {row.quantity} × {row.unit_price} ={" "}
-                    {(row.line_total ?? row.quantity * row.unit_price).toFixed(2)}
+                  {row.use_quantity !== false
+                    ? `${row.quantity} × ${row.unit_price}`
+                    : `Amount ${row.unit_price}`}{" "}
+                  ={" "}
+                  {(row.line_total ??
+                    (row.use_quantity !== false
+                      ? row.quantity * row.unit_price
+                      : row.unit_price)
+                  ).toFixed(2)}
                   </span>
                 </div>
               ))}

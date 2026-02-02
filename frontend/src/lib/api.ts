@@ -16,6 +16,8 @@ export type Company = {
 
 export type Invoice = {
   id: string;
+  company_id?: string | null;
+  user_id?: string | null;
   client_name: string;
   client_address: string;
   description: string;
@@ -33,6 +35,13 @@ export type LineItem = {
   quantity: number;
   unit_price: number;
   line_total?: number;
+  use_quantity?: boolean;
+};
+
+export type InvoiceTemplate = {
+  id: string;
+  name: string;
+  html: string;
 };
 type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -104,6 +113,8 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   createInvoice: (payload: {
+    company_id: string;
+    template_id?: string | null;
     client_name: string;
     client_address: string;
     currency: string;
@@ -112,6 +123,7 @@ export const api = {
       description: string;
       quantity: number;
       unit_price: number;
+      use_quantity?: boolean;
     }>;
   }) =>
     fetchJson<Invoice>("/invoices", {
@@ -122,6 +134,8 @@ export const api = {
   updateInvoice: (
     id: string,
     payload: Partial<{
+      company_id: string;
+      template_id?: string | null;
       client_name: string;
       client_address: string;
       currency: string;
@@ -130,6 +144,7 @@ export const api = {
         description: string;
         quantity: number;
         unit_price: number;
+        use_quantity?: boolean;
       }>;
     }>
   ) =>
@@ -138,4 +153,19 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   getInvoice: (id: string) => fetchJson<Invoice>(`/invoices/${id}`),
+  listTemplates: () => fetchJson<InvoiceTemplate[]>("/invoice-templates"),
+  createTemplate: (payload: { name: string; html: string }) =>
+    fetchJson<InvoiceTemplate>("/invoice-templates", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateTemplate: (id: string, payload: { name: string; html: string }) =>
+    fetchJson<InvoiceTemplate>(`/invoice-templates/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteTemplate: (id: string) =>
+    fetchJson<void>(`/invoice-templates/${id}`, {
+      method: "DELETE",
+    }),
 };

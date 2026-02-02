@@ -67,12 +67,13 @@ pub async fn register(
     State(state): State<AppState>,
     Json(payload): Json<RegisterRequest>,
 ) -> Result<(HeaderMap, Json<SessionResponse>), (StatusCode, String)> {
-    if payload.email.trim().is_empty() || payload.password.trim().is_empty() {
+    let email = payload.email.trim().to_lowercase();
+    if email.is_empty() || payload.password.trim().is_empty() {
         return Err((StatusCode::BAD_REQUEST, "Email and password are required".to_string()));
     }
 
     let existing = user::Entity::find()
-        .filter(user::Column::Email.eq(payload.email.clone()))
+        .filter(user::Column::Email.eq(email.clone()))
         .one(&state.db)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -86,7 +87,7 @@ pub async fn register(
 
     let user_active = user::ActiveModel {
         id: Set(Uuid::new_v4()),
-        email: Set(payload.email),
+        email: Set(email),
         password_hash: Set(password_hash),
         address: Set(payload.address),
         company_id: Set(None),
@@ -131,8 +132,9 @@ pub async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,
 ) -> Result<(HeaderMap, Json<SessionResponse>), (StatusCode, String)> {
+    let email = payload.email.trim().to_lowercase();
     let user = user::Entity::find()
-        .filter(user::Column::Email.eq(payload.email))
+        .filter(user::Column::Email.eq(email))
         .one(&state.db)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?

@@ -1,14 +1,13 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
-#[sea_orm(table_name = "company")]
+#[sea_orm(table_name = "invoice_template")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: Uuid,
-    pub user_id: Option<Uuid>,
+    pub user_id: Uuid,
     pub name: String,
-    pub address: String,
-    pub registration_number: String,
+    pub html: String,
     pub created_at: DateTimeUtc,
 }
 

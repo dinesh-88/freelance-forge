@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import type { Company, Invoice, User } from "../lib/api";
+import type { Company, Invoice, InvoiceTemplate, User } from "../lib/api";
 import DashboardHeader from "../components/DashboardHeader";
 import DashboardNav from "../components/DashboardNav";
 import type { DashboardSection } from "../components/DashboardNav";
@@ -17,6 +17,7 @@ export default function Dashboard() {
   const [company, setCompany] = useState<Company | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [templates, setTemplates] = useState<InvoiceTemplate[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -32,11 +33,15 @@ export default function Dashboard() {
   });
   const [profileForm, setProfileForm] = useState({ address: "" });
   const [invoiceForm, setInvoiceForm] = useState({
+    company_id: "",
+    template_id: "",
     client_name: "",
     client_address: "",
     currency: "EUR",
     date: new Date().toISOString().slice(0, 10),
-    items: [{ description: "", quantity: 1, unit_price: 0 }],
+    items: [
+      { id: crypto.randomUUID(), description: "", quantity: 1, unit_price: 0, use_quantity: true },
+    ],
   });
   const [invoiceResult, setInvoiceResult] = useState<Invoice | null>(null);
   const [activeSection, setActiveSection] = useState<DashboardSection>(null);
@@ -47,7 +52,11 @@ export default function Dashboard() {
   const invoiceTotal = useMemo(
     () =>
       invoiceForm.items.reduce(
-        (sum, item) => sum + Number(item.quantity || 0) * Number(item.unit_price || 0),
+        (sum, item) =>
+          sum +
+          (item.use_quantity
+            ? Number(item.quantity || 0) * Number(item.unit_price || 0)
+            : Number(item.unit_price || 0)),
         0
       ),
     [invoiceForm.items]
@@ -68,6 +77,7 @@ export default function Dashboard() {
     void loadCompany();
     void loadCompanies();
     void loadInvoices();
+    void loadTemplates();
   }
 
   async function loadCompany() {
@@ -93,6 +103,13 @@ export default function Dashboard() {
     const result = await api.listInvoices();
     if (result.ok) {
       setInvoices(result.data);
+    }
+  }
+
+  async function loadTemplates() {
+    const result = await api.listTemplates();
+    if (result.ok) {
+      setTemplates(result.data);
     }
   }
 
@@ -156,12 +173,19 @@ export default function Dashboard() {
   async function handleInvoiceCreate() {
     setLoading(true);
     setStatus(null);
+    if (!invoiceForm.company_id) {
+      setLoading(false);
+      setStatus("Select a client company.");
+      return;
+    }
     if (!invoiceForm.items.length) {
       setLoading(false);
       setStatus("Add at least one line item.");
       return;
     }
     const payload = {
+      company_id: invoiceForm.company_id,
+      template_id: invoiceForm.template_id || undefined,
       client_name: invoiceForm.client_name,
       client_address: invoiceForm.client_address,
       currency: invoiceForm.currency,
@@ -170,6 +194,7 @@ export default function Dashboard() {
         description: item.description,
         quantity: Number(item.quantity || 0),
         unit_price: Number(item.unit_price || 0),
+        use_quantity: item.use_quantity,
       })),
     };
     const result = await api.createInvoice(payload);
@@ -193,6 +218,8 @@ export default function Dashboard() {
     setLoading(true);
     setStatus(null);
     const result = await api.updateInvoice(editingInvoiceId, {
+      company_id: invoiceForm.company_id || undefined,
+      template_id: invoiceForm.template_id || undefined,
       client_name: invoiceForm.client_name || undefined,
       client_address: invoiceForm.client_address || undefined,
       currency: invoiceForm.currency || undefined,
@@ -201,6 +228,7 @@ export default function Dashboard() {
         description: item.description,
         quantity: Number(item.quantity || 0),
         unit_price: Number(item.unit_price || 0),
+        use_quantity: item.use_quantity,
       })),
     });
     setLoading(false);
@@ -243,21 +271,28 @@ export default function Dashboard() {
     }
   }
 
+
   function handleInvoiceEdit(invoice: Invoice) {
     setInvoiceMode("edit");
     setEditingInvoiceId(invoice.id);
     setInvoiceForm({
+      company_id: invoice.company_id || "",
+      template_id: invoice.template_id || "",
       client_name: invoice.client_name,
       client_address: invoice.client_address || "",
       currency: invoice.currency,
       date: invoice.date,
       items: invoice.items?.length
         ? invoice.items.map((row) => ({
+            id: crypto.randomUUID(),
             description: row.description,
             quantity: row.quantity,
             unit_price: row.unit_price,
+            use_quantity: row.use_quantity ?? true,
           }))
-        : [{ description: "", quantity: 1, unit_price: 0 }],
+        : [
+            { id: crypto.randomUUID(), description: "", quantity: 1, unit_price: 0, use_quantity: true },
+          ],
     });
     setInvoiceResult(invoice);
   }
@@ -266,13 +301,18 @@ export default function Dashboard() {
     setInvoiceMode("create");
     setEditingInvoiceId(null);
     setInvoiceForm({
+      company_id: "",
+      template_id: "",
       client_name: "",
       client_address: "",
       currency: "EUR",
       date: new Date().toISOString().slice(0, 10),
-      items: [{ description: "", quantity: 1, unit_price: 0 }],
+      items: [
+        { id: crypto.randomUUID(), description: "", quantity: 1, unit_price: 0, use_quantity: true },
+      ],
     });
   }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-cloud via-white to-[#FCE6D8] text-ink">
@@ -323,6 +363,7 @@ export default function Dashboard() {
                   <InvoiceForm
                     invoiceForm={invoiceForm}
                     companies={companies}
+                    templates={templates}
                     hasAddress={hasAddress}
                     invoiceMode={invoiceMode}
                     loading={loading}

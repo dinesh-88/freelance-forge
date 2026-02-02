@@ -7,7 +7,7 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, Utc};
-use sea_orm::{ActiveModelTrait, EntityTrait, Set};
+use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -29,6 +29,7 @@ pub struct CompanyUpdateRequest {
 #[derive(Serialize, ToSchema)]
 pub struct CompanyResponse {
     pub id: Uuid,
+    pub user_id: Option<Uuid>,
     pub name: String,
     pub address: String,
     pub registration_number: String,
@@ -63,6 +64,7 @@ pub async fn create_company(
 
     let active = company::ActiveModel {
         id: Set(Uuid::new_v4()),
+        user_id: Set(Some(current_user.id)),
         name: Set(payload.name),
         address: Set(payload.address),
         registration_number: Set(payload.registration_number),
@@ -83,6 +85,7 @@ pub async fn create_company(
 
     Ok(Json(CompanyResponse {
         id: created.id,
+        user_id: created.user_id,
         name: created.name,
         address: created.address,
         registration_number: created.registration_number,
@@ -114,6 +117,7 @@ pub async fn update_company(
         .ok_or_else(|| (axum::http::StatusCode::NOT_FOUND, "Company not found".to_string()))?;
 
     let existing = company::Entity::find_by_id(company_id)
+        .filter(company::Column::UserId.eq(current_user.id))
         .one(&state.db)
         .await
         .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
@@ -146,6 +150,7 @@ pub async fn update_company(
 
     Ok(Json(CompanyResponse {
         id: updated.id,
+        user_id: updated.user_id,
         name: updated.name,
         address: updated.address,
         registration_number: updated.registration_number,
@@ -174,6 +179,7 @@ pub async fn get_my_company(
         .ok_or_else(|| (axum::http::StatusCode::NOT_FOUND, "Company not found".to_string()))?;
 
     let company = company::Entity::find_by_id(company_id)
+        .filter(company::Column::UserId.eq(current_user.id))
         .one(&state.db)
         .await
         .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
@@ -181,6 +187,7 @@ pub async fn get_my_company(
 
     Ok(Json(CompanyResponse {
         id: company.id,
+        user_id: company.user_id,
         name: company.name,
         address: company.address,
         registration_number: company.registration_number,
@@ -202,8 +209,9 @@ pub async fn list_companies(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> Result<Json<Vec<CompanyResponse>>, (axum::http::StatusCode, String)> {
-    let _user = require_user(&state, &headers).await?;
+    let current_user = require_user(&state, &headers).await?;
     let companies = company::Entity::find()
+        .filter(company::Column::UserId.eq(current_user.id))
         .all(&state.db)
         .await
         .map_err(|e| (axum::http::StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -212,6 +220,7 @@ pub async fn list_companies(
         .into_iter()
         .map(|item| CompanyResponse {
             id: item.id,
+            user_id: item.user_id,
             name: item.name,
             address: item.address,
             registration_number: item.registration_number,
