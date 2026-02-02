@@ -134,7 +134,8 @@ async fn root() -> &'static str {
 }
 
 fn build_cors() -> CorsLayer {
-    let origin = std::env::var("FRONTEND_ORIGIN")
+    let origin = std::env::var("CORS_ORIGIN")
+        .or_else(|_| std::env::var("FRONTEND_ORIGIN"))
         .unwrap_or_else(|_| "http://localhost:5173".to_string());
     let allowed_origin = origin
         .parse::<axum::http::HeaderValue>()
