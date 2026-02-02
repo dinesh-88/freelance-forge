@@ -308,10 +308,12 @@ async fn create_session(
     let max_age = SESSION_DURATION_DAYS * 24 * 60 * 60;
     let secure = std::env::var("COOKIE_SECURE").unwrap_or_else(|_| "false".to_string());
     let secure_flag = if secure == "true" { "; Secure" } else { "" };
+    let same_site_env = std::env::var("COOKIE_SAMESITE")
+        .unwrap_or_else(|_| if secure == "true" { "None".to_string() } else { "Lax".to_string() });
 
     let cookie_value = format!(
-        "session_id={}; Path=/; HttpOnly; SameSite=Lax; Max-Age={}{}",
-        session.id, max_age, secure_flag
+        "session_id={}; Path=/; HttpOnly; SameSite={}; Max-Age={}{}",
+        session.id, same_site_env, max_age, secure_flag
     );
 
     let header = axum::http::HeaderValue::from_str(&cookie_value)
