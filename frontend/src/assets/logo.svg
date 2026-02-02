@@ -1,0 +1,13 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Freelance Forge logo">
+  <rect width="512" height="512" rx="96" fill="#F2F5F7"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M120 220h168c32 0 58 26 58 58v16H120v-74z" fill="#2F3A44"/>
+    <path d="M346 220h46c22 0 40 18 40 40v34h-86v-74z" fill="#2F3A44"/>
+    <path d="M142 294h228l-18 50c-6 16-21 26-38 26H198c-17 0-32-10-38-26l-18-50z" fill="#2F3A44"/>
+    <path d="M208 370h96v40c0 12-10 22-22 22h-52c-12 0-22-10-22-22v-40z" fill="#2F3A44"/>
+    <path d="M156 184l36-56 36 56" stroke="#2AA7A1" stroke-width="16"/>
+    <circle cx="192" cy="152" r="10" fill="#2AA7A1"/>
+    <path d="M280 170l32-48 32 48" stroke="#2AA7A1" stroke-width="12"/>
+    <circle cx="312" cy="142" r="8" fill="#2AA7A1"/>
+  </g>
+</svg>

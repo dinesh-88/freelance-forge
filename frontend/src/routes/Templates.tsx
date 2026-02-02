@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import type { InvoiceTemplate } from "../lib/api";
+import logo from "../assets/logo.svg";
 
 export default function Templates() {
   const navigate = useNavigate();
@@ -71,12 +72,15 @@ export default function Templates() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cloud via-white to-[#FCE6D8] text-ink">
+    <div className="min-h-screen bg-gradient-to-br from-cloud via-white to-[#E6F6F5] text-ink">
       <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-8 px-6 py-10">
         <header className="flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-ember">Freelance Forge</p>
-            <h1 className="font-display text-3xl">Invoice Templates</h1>
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="Freelance Forge" className="h-10 w-10" />
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-ember">Freelance Forge</p>
+              <h1 className="font-display text-3xl">Invoice Templates</h1>
+            </div>
           </div>
           <Link
             to="/app"

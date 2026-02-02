@@ -1,0 +1,13 @@
+<svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Freelance Forge favicon">
+  <rect width="64" height="64" rx="14" fill="#F2F5F7"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 28h22c5 0 9 4 9 9v2H12v-11z" fill="#2F3A44"/>
+    <path d="M43 28h7c4 0 7 3 7 7v4h-14v-11z" fill="#2F3A44"/>
+    <path d="M15 39h34l-3 8c-1 3-4 5-7 5H25c-3 0-6-2-7-5l-3-8z" fill="#2F3A44"/>
+    <path d="M26 52h12v4c0 2-2 4-4 4h-4c-2 0-4-2-4-4v-4z" fill="#2F3A44"/>
+    <path d="M20 22l5-8 5 8" stroke="#2AA7A1" stroke-width="2"/>
+    <circle cx="25" cy="16" r="2" fill="#2AA7A1"/>
+    <path d="M34 20l4-6 4 6" stroke="#2AA7A1" stroke-width="2"/>
+    <circle cx="38" cy="15" r="2" fill="#2AA7A1"/>
+  </g>
+</svg>

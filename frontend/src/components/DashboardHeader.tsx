@@ -1,12 +1,16 @@
 import type { User } from "../lib/api";
+import logo from "../assets/logo.svg";
 
 export default function DashboardHeader({ user }: { user: User | null }) {
   return (
     <header className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
       <div className="space-y-2">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-ember">
-          Freelance Forge
-        </p>
+        <div className="flex items-center gap-3">
+          <img src={logo} alt="Freelance Forge" className="h-10 w-10" />
+          <p className="text-sm font-semibold uppercase tracking-[0.2em] text-ember">
+            Freelance Forge
+          </p>
+        </div>
         <h1 className="font-display text-3xl font-semibold text-ink md:text-4xl">
           Dashboard
         </h1>
