@@ -250,7 +250,7 @@ export default function Invoices() {
             </div>
           )}
 
-          <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <section className="space-y-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-display text-2xl">Invoices</h2>
@@ -279,19 +279,17 @@ export default function Invoices() {
               )}
             </div>
 
-            <div className="space-y-6">
-              <InvoiceTable
-                invoices={invoices}
-                onView={setInvoiceResult}
-                onEdit={handleInvoiceEdit}
-                onDownload={handleInvoiceDownload}
-              />
-              <InvoicePreview
-                invoice={invoiceResult}
-                loading={loading}
-                onDownload={() => handleInvoiceDownload()}
-              />
-            </div>
+            <InvoiceTable
+              invoices={invoices}
+              onView={setInvoiceResult}
+              onEdit={handleInvoiceEdit}
+              onDownload={handleInvoiceDownload}
+            />
+            <InvoicePreview
+              invoice={invoiceResult}
+              loading={loading}
+              onDownload={() => handleInvoiceDownload()}
+            />
           </section>
         </main>
       </div>
