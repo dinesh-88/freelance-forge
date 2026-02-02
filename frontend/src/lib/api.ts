@@ -18,6 +18,7 @@ export type Invoice = {
   id: string;
   company_id?: string | null;
   user_id?: string | null;
+  template_id?: string | null;
   client_name: string;
   client_address: string;
   description: string;

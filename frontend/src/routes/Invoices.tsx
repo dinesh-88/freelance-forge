@@ -18,7 +18,21 @@ export default function Invoices() {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
-  const [invoiceForm, setInvoiceForm] = useState({
+  const [invoiceForm, setInvoiceForm] = useState<{
+    company_id: string;
+    template_id: string;
+    client_name: string;
+    client_address: string;
+    currency: string;
+    date: string;
+    items: Array<{
+      id: string;
+      description: string;
+      quantity: number;
+      unit_price: number;
+      use_quantity: boolean;
+    }>;
+  }>({
     company_id: "",
     template_id: "",
     client_name: "",
