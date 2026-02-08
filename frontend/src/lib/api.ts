@@ -16,6 +16,7 @@ export type Company = {
 
 export type Invoice = {
   id: string;
+  invoice_number: string;
   company_id?: string | null;
   user_id?: string | null;
   template_id?: string | null;

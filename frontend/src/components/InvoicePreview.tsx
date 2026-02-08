@@ -14,6 +14,10 @@ export default function InvoicePreview({
       <h3 className="font-display text-xl">Invoice preview</h3>
       {invoice ? (
         <div className="mt-4 space-y-3 text-sm text-slate">
+          <div className="flex items-center justify-between">
+            <p className="text-xs uppercase tracking-[0.2em] text-haze">Invoice</p>
+            <span className="text-xs font-semibold text-slate">{invoice.invoice_number}</span>
+          </div>
           <p className="text-xs uppercase tracking-[0.2em] text-haze">Client</p>
           <p className="text-lg font-semibold text-ink">{invoice.client_name}</p>
           <p className="text-sm text-slate">{invoice.client_address}</p>

@@ -9,14 +9,14 @@ use axum::{
 };
 use chrono::NaiveDate;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait,
+    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, TransactionTrait,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
 use std::io::Write;
 use std::process::{Command, Stdio};
-use handlebars::Handlebars;
+use handlebars::{Context, Handlebars, Helper, HelperResult, Output, RenderContext};
 use serde_json::json;
 
 #[derive(Deserialize, ToSchema)]
@@ -51,6 +51,7 @@ pub struct LineItemResponse {
 #[derive(Serialize, ToSchema)]
 pub struct InvoiceResponse {
     pub id: Uuid,
+    pub invoice_number: String,
     pub company_id: Option<Uuid>,
     pub user_id: Option<Uuid>,
     pub template_id: Option<Uuid>,
@@ -148,8 +149,10 @@ pub async fn create_invoice(
 
     let template_id = resolve_template_id(&state.db, user.id, payload.template_id).await?;
 
+    let invoice_number = next_invoice_number(&state.db, user.id).await?;
     let active = invoice::ActiveModel {
         id: Set(Uuid::new_v4()),
+        invoice_number: Set(invoice_number),
         user_id: Set(Some(user.id)),
         company_id: Set(Some(company.id)),
         template_id: Set(template_id),
@@ -205,6 +208,7 @@ pub async fn create_invoice(
 
     Ok(Json(InvoiceResponse {
         id: created.id,
+        invoice_number: created.invoice_number,
         company_id: created.company_id,
         user_id: created.user_id,
         template_id: created.template_id,
@@ -246,6 +250,7 @@ pub async fn list_invoices(
         let items = load_items(&state.db, item.id).await?;
         response.push(InvoiceResponse {
             id: item.id,
+            invoice_number: item.invoice_number,
             company_id: item.company_id,
             user_id: item.user_id,
             template_id: item.template_id,
@@ -299,6 +304,7 @@ pub async fn get_invoice(
     let items = load_items(&state.db, invoice.id).await?;
     Ok(Json(InvoiceResponse {
         id: invoice.id,
+        invoice_number: invoice.invoice_number,
         company_id: invoice.company_id,
         user_id: invoice.user_id,
         template_id: invoice.template_id,
@@ -457,6 +463,7 @@ pub async fn update_invoice(
 
         return Ok(Json(InvoiceResponse {
             id: updated.id,
+            invoice_number: updated.invoice_number,
             company_id: updated.company_id,
             user_id: updated.user_id,
             template_id: updated.template_id,
@@ -481,6 +488,7 @@ pub async fn update_invoice(
 
     Ok(Json(InvoiceResponse {
         id: updated.id,
+        invoice_number: updated.invoice_number,
         company_id: updated.company_id,
         user_id: updated.user_id,
         template_id: updated.template_id,
@@ -712,10 +720,34 @@ fn build_invoice_pdf(
 ) -> Result<Vec<u8>, String> {
     let mut handlebars = Handlebars::new();
     handlebars.register_escape_fn(|s| s.to_string());
+    handlebars.register_helper(
+        "money",
+        Box::new(
+            |h: &Helper<'_>,
+             _: &Handlebars,
+             ctx: &Context,
+             _: &mut RenderContext<'_, '_>,
+             out: &mut dyn Output|
+             -> HelperResult {
+                let value = h
+                    .param(0)
+                    .and_then(|v| v.value().as_f64())
+                    .unwrap_or(0.0);
+                let currency = h
+                    .param(1)
+                    .and_then(|v| v.value().as_str())
+                    .or_else(|| ctx.data().get("currency").and_then(|v| v.as_str()))
+                    .unwrap_or("EUR");
+                out.write(&format_money(value, currency))?;
+                Ok(())
+            },
+        ),
+    );
     let subtotal: f64 = items.iter().map(|item| item.line_total).sum();
     let invoice_note = "Rechnungsbetrag ohne Umsatzsteuer gemäß § 19 Abs. 1 UStG. (Invoice amount without sales tax according to § 19 paragraph 1 UStG)".to_string();
     let ctx = json!({
         "invoice_id": invoice.id.to_string(),
+        "invoice_number": invoice.invoice_number,
         "invoice_date": invoice.date.to_string(),
         "client_name": invoice.client_name,
         "client_address": invoice.client_address,
@@ -870,6 +902,31 @@ fn build_invoice_pdf(
     Ok(output.stdout)
 }
 
+fn format_money(value: f64, currency: &str) -> String {
+    let (thousands, decimal) = match currency {
+        "EUR" => ('.', ','),
+        "USD" | "GBP" => (',', '.'),
+        _ => (',', '.'),
+    };
+
+    let sign = if value < 0.0 { "-" } else { "" };
+    let abs_value = value.abs();
+    let raw = format!("{:.2}", abs_value);
+    let mut parts = raw.split('.');
+    let int_part = parts.next().unwrap_or("0");
+    let frac_part = parts.next().unwrap_or("00");
+
+    let mut grouped = String::new();
+    for (i, ch) in int_part.chars().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            grouped.push(thousands);
+        }
+        grouped.push(ch);
+    }
+    let int_grouped: String = grouped.chars().rev().collect();
+    format!("{sign}{int_grouped}{decimal}{frac_part}")
+}
+
 #[derive(Clone)]
 struct InvoiceTemplateData {
     html: String,
@@ -996,4 +1053,16 @@ async fn load_items(
             use_quantity: item.use_quantity,
         })
         .collect())
+}
+
+async fn next_invoice_number(
+    db: &sea_orm::DatabaseConnection,
+    user_id: Uuid,
+) -> Result<String, (StatusCode, String)> {
+    let count = invoice::Entity::find()
+        .filter(invoice::Column::UserId.eq(user_id))
+        .count(db)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    Ok(format!("IN-{:05}", count + 1))
 }

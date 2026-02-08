@@ -21,6 +21,7 @@ export default function InvoiceTable({
         <table className="w-full text-left text-sm">
           <thead className="text-xs uppercase tracking-[0.2em] text-haze">
             <tr>
+              <th className="pb-2">Invoice #</th>
               <th className="pb-2">Client</th>
               <th className="pb-2">Amount</th>
               <th className="pb-2">Date</th>
@@ -30,6 +31,9 @@ export default function InvoiceTable({
           <tbody className="text-slate">
             {invoices.map((item) => (
               <tr key={item.id} className="border-t border-ink/10">
+                <td className="py-3 text-xs font-semibold text-slate">
+                  {item.invoice_number || item.id.slice(0, 8)}
+                </td>
                 <td className="py-3 font-semibold text-ink">{item.client_name}</td>
                 <td className="py-3">
                   {item.currency} {(item.total_amount ?? item.amount).toFixed(2)}
@@ -64,7 +68,7 @@ export default function InvoiceTable({
             ))}
             {invoices.length === 0 && (
               <tr>
-                <td className="py-4 text-sm text-haze" colSpan={4}>
+                <td className="py-4 text-sm text-haze" colSpan={5}>
                   No invoices yet. Create one to get started.
                 </td>
               </tr>
