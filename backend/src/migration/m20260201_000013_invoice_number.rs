@@ -24,7 +24,7 @@ impl MigrationTrait for Migration {
         let db = manager.get_connection();
         db.execute(Statement::from_string(
             DbBackend::Postgres,
-            "UPDATE invoice SET invoice_number = CONCAT('IN-', LPAD((ROW_NUMBER() OVER (ORDER BY id))::text, 5, '0'))".to_string(),
+            "WITH numbered AS (SELECT id, ROW_NUMBER() OVER (ORDER BY id) AS rn FROM invoice)\nUPDATE invoice SET invoice_number = CONCAT('IN-', LPAD(numbered.rn::text, 5, '0'))\nFROM numbered WHERE invoice.id = numbered.id".to_string(),
         ))
         .await?;
 
