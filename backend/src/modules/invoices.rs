@@ -884,7 +884,7 @@ fn build_invoice_pdf(
     };
 
     let mut child = Command::new("wkhtmltopdf")
-        .args(["-q", "-", "-"])
+        .args(["-q", "--encoding", "utf-8", "-", "-"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
