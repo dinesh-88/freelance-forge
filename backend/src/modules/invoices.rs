@@ -778,8 +778,11 @@ fn build_invoice_pdf(
 
     let html = if template.is_custom {
         let template_html = render(&template.html);
-        format!(
-            r#"<!doctype html>
+        if template_html.to_lowercase().contains("<html") {
+            template_html
+        } else {
+            format!(
+                r#"<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
@@ -797,8 +800,9 @@ fn build_invoice_pdf(
   {}
 </body>
 </html>"#,
-            template_html
-        )
+                template_html
+            )
+        }
     } else {
         let html_template = format!(
             r#"<!doctype html>
