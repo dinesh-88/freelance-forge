@@ -20,6 +20,12 @@ use modules::company::{
     create_company, get_my_company, list_companies, update_company, CompanyCreateRequest,
     CompanyResponse, CompanyUpdateRequest,
 };
+use modules::expenses::{
+    __path_create_expense, __path_create_receipt_upload_url, __path_delete_expense,
+    __path_list_expenses, __path_update_expense, create_expense, create_receipt_upload_url,
+    delete_expense, list_expenses, update_expense, ExpenseCreateRequest, ExpenseResponse,
+    ExpenseUpdateRequest, ReceiptUploadRequest, ReceiptUploadResponse,
+};
 use modules::invoices::{
     __path_create_invoice, __path_get_invoice, __path_get_invoice_pdf, __path_list_invoices,
     __path_update_invoice, __path_create_template, __path_list_templates, __path_update_template,
@@ -47,6 +53,11 @@ use modules::shared::AppState;
         update_company,
         get_my_company,
         list_companies,
+        list_expenses,
+        create_expense,
+        update_expense,
+        delete_expense,
+        create_receipt_upload_url,
         register,
         update_profile,
         login,
@@ -64,6 +75,11 @@ use modules::shared::AppState;
         CompanyCreateRequest,
         CompanyUpdateRequest,
         CompanyResponse,
+        ExpenseCreateRequest,
+        ExpenseUpdateRequest,
+        ExpenseResponse,
+        ReceiptUploadRequest,
+        ReceiptUploadResponse,
         RegisterRequest,
         LoginRequest,
         UpdateProfileRequest,
@@ -74,7 +90,8 @@ use modules::shared::AppState;
         (name = "health", description = "Health check"),
         (name = "invoices", description = "Invoice management"),
         (name = "auth", description = "Authentication"),
-        (name = "company", description = "Company onboarding")
+        (name = "company", description = "Company onboarding"),
+        (name = "expenses", description = "Expense management")
     )
 )]
 struct ApiDoc;
@@ -104,6 +121,11 @@ async fn main() -> anyhow::Result<()> {
         .route("/company", axum::routing::patch(update_company))
         .route("/company", get(list_companies))
         .route("/company/me", get(get_my_company))
+        .route("/expenses", get(list_expenses))
+        .route("/expenses", post(create_expense))
+        .route("/expenses/:id", axum::routing::patch(update_expense))
+        .route("/expenses/:id", axum::routing::delete(delete_expense))
+        .route("/expenses/receipt-url", post(create_receipt_upload_url))
         .route("/auth/register", post(register))
         .route("/auth/login", post(login))
         .route("/auth/logout", post(logout))
@@ -147,6 +169,7 @@ fn build_cors() -> CorsLayer {
             axum::http::Method::GET,
             axum::http::Method::POST,
             axum::http::Method::PATCH,
+            axum::http::Method::DELETE,
         ])
         .allow_headers([axum::http::header::CONTENT_TYPE])
         .allow_credentials(true)

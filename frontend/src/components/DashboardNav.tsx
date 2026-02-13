@@ -17,6 +17,7 @@ export default function DashboardNav({
   const isTemplates = location.pathname.startsWith("/app/templates");
   const isInvoices = location.pathname.startsWith("/app/invoices");
   const isReports = location.pathname.startsWith("/app/reports");
+  const isExpenses = location.pathname.startsWith("/app/expenses");
 
   return (
     <nav className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm text-slate shadow-lift">
@@ -47,6 +48,14 @@ export default function DashboardNav({
         to="/app/reports"
       >
         Reports
+      </Link>
+      <Link
+        className={`rounded-full px-3 py-1 transition ${
+          isExpenses ? "bg-ink text-white" : "hover:bg-ink/10"
+        }`}
+        to="/app/expenses"
+      >
+        Expenses
       </Link>
       <Link
         className={`rounded-full px-3 py-1 transition ${

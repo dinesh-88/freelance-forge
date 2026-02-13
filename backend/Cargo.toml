@@ -19,3 +19,5 @@ utoipa-swagger-ui = { version = "7", features = ["axum"] }
 argon2 = "0.5"
 tower-http = { version = "0.5", features = ["cors"] }
 handlebars = "5"
+aws-config = "1"
+aws-sdk-s3 = "1"

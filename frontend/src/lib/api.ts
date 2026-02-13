@@ -40,6 +40,22 @@ export type LineItem = {
   use_quantity?: boolean;
 };
 
+export type Expense = {
+  id: string;
+  vendor: string;
+  description: string;
+  amount: number;
+  currency: string;
+  date: string;
+  category?: string | null;
+  receipt_url?: string | null;
+};
+
+export type ReceiptUpload = {
+  upload_url: string;
+  receipt_url: string;
+};
+
 export type InvoiceTemplate = {
   id: string;
   name: string;
@@ -169,5 +185,44 @@ export const api = {
   deleteTemplate: (id: string) =>
     fetchJson<void>(`/invoice-templates/${id}`, {
       method: "DELETE",
+    }),
+  listExpenses: () => fetchJson<Expense[]>("/expenses"),
+  createExpense: (payload: {
+    vendor: string;
+    description: string;
+    amount: number;
+    currency: string;
+    date: string;
+    category?: string | null;
+    receipt_url?: string | null;
+  }) =>
+    fetchJson<Expense>("/expenses", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateExpense: (
+    id: string,
+    payload: Partial<{
+      vendor: string;
+      description: string;
+      amount: number;
+      currency: string;
+      date: string;
+      category?: string | null;
+      receipt_url?: string | null;
+    }>
+  ) =>
+    fetchJson<Expense>(`/expenses/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteExpense: (id: string) =>
+    fetchJson<void>(`/expenses/${id}`, {
+      method: "DELETE",
+    }),
+  createReceiptUpload: (payload: { filename: string; content_type: string }) =>
+    fetchJson<ReceiptUpload>("/expenses/receipt-url", {
+      method: "POST",
+      body: JSON.stringify(payload),
     }),
 };

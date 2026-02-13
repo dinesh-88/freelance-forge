@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import type { Invoice, User } from "../lib/api";
+import type { Expense, Invoice, User } from "../lib/api";
 import DashboardHeader from "../components/DashboardHeader";
 import DashboardNav from "../components/DashboardNav";
 
@@ -11,6 +11,7 @@ export default function Reports() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
@@ -30,10 +31,17 @@ export default function Reports() {
     } else {
       setStatus(invoiceResult.error);
     }
+    const expenseResult = await api.listExpenses();
+    if (expenseResult.ok) {
+      setExpenses(expenseResult.data);
+    } else {
+      setStatus(expenseResult.error);
+    }
   }
 
   const totals = useMemo(() => {
     const totalRevenue = invoices.reduce((sum, invoice) => sum + invoice.total_amount, 0);
+    const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
     const avgInvoice = invoices.length ? totalRevenue / invoices.length : 0;
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -44,8 +52,20 @@ export default function Reports() {
         return date.getFullYear() === currentYear && date.getMonth() === currentMonth;
       })
       .reduce((sum, invoice) => sum + invoice.total_amount, 0);
-    return { totalRevenue, avgInvoice, monthRevenue };
-  }, [invoices]);
+    const monthExpenses = expenses
+      .filter((expense) => {
+        const date = new Date(expense.date);
+        return date.getFullYear() === currentYear && date.getMonth() === currentMonth;
+      })
+      .reduce((sum, expense) => sum + expense.amount, 0);
+    return {
+      totalRevenue,
+      totalExpenses,
+      avgInvoice,
+      monthRevenue,
+      monthExpenses,
+    };
+  }, [invoices, expenses]);
 
   const monthlySeries = useMemo(() => {
     const now = new Date();
@@ -84,11 +104,16 @@ export default function Reports() {
             </div>
           )}
 
-          <section className="grid gap-6 lg:grid-cols-3">
+          <section className="grid gap-6 lg:grid-cols-4">
             <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
               <p className="text-xs uppercase tracking-[0.2em] text-haze">Total revenue</p>
               <p className="mt-3 text-2xl font-semibold text-ink">EUR {totals.totalRevenue.toFixed(2)}</p>
               <p className="mt-2 text-sm text-slate">All invoices to date.</p>
+            </div>
+            <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
+              <p className="text-xs uppercase tracking-[0.2em] text-haze">Total expenses</p>
+              <p className="mt-3 text-2xl font-semibold text-ink">EUR {totals.totalExpenses.toFixed(2)}</p>
+              <p className="mt-2 text-sm text-slate">Expenses recorded.</p>
             </div>
             <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
               <p className="text-xs uppercase tracking-[0.2em] text-haze">Invoices</p>
@@ -97,8 +122,12 @@ export default function Reports() {
             </div>
             <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
               <p className="text-xs uppercase tracking-[0.2em] text-haze">This month</p>
-              <p className="mt-3 text-2xl font-semibold text-ink">EUR {totals.monthRevenue.toFixed(2)}</p>
-              <p className="mt-2 text-sm text-slate">Revenue in the current month.</p>
+              <p className="mt-3 text-2xl font-semibold text-ink">
+                EUR {(totals.monthRevenue - totals.monthExpenses).toFixed(2)}
+              </p>
+              <p className="mt-2 text-sm text-slate">
+                Revenue EUR {totals.monthRevenue.toFixed(2)} · Expenses EUR {totals.monthExpenses.toFixed(2)}
+              </p>
             </div>
           </section>
 
