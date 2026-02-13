@@ -226,6 +226,37 @@ export default function Invoices() {
     setShowForm(true);
   }
 
+  function handleInvoiceDuplicate(invoice: Invoice) {
+    if (!invoice.company_id) {
+      setStatus("Invoice has no company to duplicate.");
+      return;
+    }
+    setInvoiceMode("create");
+    setEditingInvoiceId(null);
+    setInvoiceForm({
+      company_id: invoice.company_id,
+      template_id: invoice.template_id || "",
+      client_name: invoice.client_name,
+      client_address: invoice.client_address || "",
+      currency: invoice.currency,
+      date: new Date().toISOString().slice(0, 10),
+      items: invoice.items?.length
+        ? invoice.items.map((row) => ({
+            id: crypto.randomUUID(),
+            description: row.description,
+            quantity: row.quantity,
+            unit_price: row.unit_price,
+            use_quantity: row.use_quantity ?? true,
+          }))
+        : [
+            { id: crypto.randomUUID(), description: "", quantity: 1, unit_price: 0, use_quantity: true },
+          ],
+    });
+    setInvoiceResult(null);
+    setShowForm(true);
+    setStatus("Invoice duplicated. Review and save.");
+  }
+
   function handleInvoiceNew() {
     setInvoiceMode("create");
     setEditingInvoiceId(null);
@@ -293,12 +324,13 @@ export default function Invoices() {
               )}
             </div>
 
-            <InvoiceTable
-              invoices={invoices}
-              onView={setInvoiceResult}
-              onEdit={handleInvoiceEdit}
-              onDownload={handleInvoiceDownload}
-            />
+              <InvoiceTable
+                invoices={invoices}
+                onView={setInvoiceResult}
+                onEdit={handleInvoiceEdit}
+                onDuplicate={handleInvoiceDuplicate}
+                onDownload={handleInvoiceDownload}
+              />
             <InvoicePreview
               invoice={invoiceResult}
               loading={loading}

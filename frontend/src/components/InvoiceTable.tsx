@@ -4,11 +4,13 @@ export default function InvoiceTable({
   invoices,
   onView,
   onEdit,
+  onDuplicate,
   onDownload,
 }: {
   invoices: Invoice[];
   onView: (invoice: Invoice) => void;
   onEdit: (invoice: Invoice) => void;
+  onDuplicate: (invoice: Invoice) => void;
   onDownload: (invoice: Invoice) => void;
 }) {
   return (
@@ -54,6 +56,13 @@ export default function InvoiceTable({
                       type="button"
                     >
                       Edit
+                    </button>
+                    <button
+                      className="rounded-lg border border-ink/10 px-3 py-1 text-xs font-semibold"
+                      onClick={() => onDuplicate(item)}
+                      type="button"
+                    >
+                      Duplicate
                     </button>
                     <button
                       className="rounded-lg border border-ink/10 px-3 py-1 text-xs font-semibold"
