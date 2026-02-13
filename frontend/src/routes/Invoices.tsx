@@ -46,6 +46,8 @@ export default function Invoices() {
   const [invoiceResult, setInvoiceResult] = useState<Invoice | null>(null);
   const [invoiceMode, setInvoiceMode] = useState<"create" | "edit">("create");
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
+  const currentYear = new Date().getFullYear();
+  const [filterYear, setFilterYear] = useState(String(currentYear));
 
   const hasAddress = useMemo(() => Boolean(user?.address), [user]);
   const invoiceTotal = useMemo(
@@ -60,6 +62,18 @@ export default function Invoices() {
       ),
     [invoiceForm.items]
   );
+
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    invoices.forEach((invoice) => years.add(new Date(invoice.date).getFullYear()));
+    years.add(currentYear);
+    return Array.from(years).sort((a, b) => b - a);
+  }, [invoices, currentYear]);
+
+  const filteredInvoices = useMemo(() => {
+    const year = Number(filterYear);
+    return invoices.filter((invoice) => new Date(invoice.date).getFullYear() === year);
+  }, [invoices, filterYear]);
 
   useEffect(() => {
     void loadSession();
@@ -324,8 +338,25 @@ export default function Invoices() {
               )}
             </div>
 
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h3 className="font-display text-xl">Invoice list</h3>
+                <div className="flex items-center gap-3 text-sm">
+                  <label className="text-xs uppercase tracking-[0.2em] text-haze">Year</label>
+                  <select
+                    className="rounded-xl border border-ink/10 bg-white/80 px-3 py-2"
+                    value={filterYear}
+                    onChange={(event) => setFilterYear(event.target.value)}
+                  >
+                    {availableYears.map((year) => (
+                      <option key={year} value={String(year)}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <InvoiceTable
-                invoices={invoices}
+                invoices={filteredInvoices}
                 onView={setInvoiceResult}
                 onEdit={handleInvoiceEdit}
                 onDuplicate={handleInvoiceDuplicate}
