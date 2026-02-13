@@ -1,0 +1,129 @@
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { api } from "../lib/api";
+import type { Invoice, User } from "../lib/api";
+import DashboardHeader from "../components/DashboardHeader";
+import DashboardNav from "../components/DashboardNav";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export default function Reports() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    void loadSession();
+  }, []);
+
+  async function loadSession() {
+    const result = await api.me();
+    if (!result.ok) {
+      navigate("/", { replace: true });
+      return;
+    }
+    setUser(result.data);
+    const invoiceResult = await api.listInvoices();
+    if (invoiceResult.ok) {
+      setInvoices(invoiceResult.data);
+    } else {
+      setStatus(invoiceResult.error);
+    }
+  }
+
+  const totals = useMemo(() => {
+    const totalRevenue = invoices.reduce((sum, invoice) => sum + invoice.total_amount, 0);
+    const avgInvoice = invoices.length ? totalRevenue / invoices.length : 0;
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const monthRevenue = invoices
+      .filter((invoice) => {
+        const date = new Date(invoice.date);
+        return date.getFullYear() === currentYear && date.getMonth() === currentMonth;
+      })
+      .reduce((sum, invoice) => sum + invoice.total_amount, 0);
+    return { totalRevenue, avgInvoice, monthRevenue };
+  }, [invoices]);
+
+  const monthlySeries = useMemo(() => {
+    const now = new Date();
+    const series: Array<{ label: string; value: number }> = [];
+    for (let i = 5; i >= 0; i -= 1) {
+      const target = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = `${MONTHS[target.getMonth()]} ${String(target.getFullYear()).slice(-2)}`;
+      const value = invoices
+        .filter((invoice) => {
+          const date = new Date(invoice.date);
+          return date.getFullYear() === target.getFullYear() && date.getMonth() === target.getMonth();
+        })
+        .reduce((sum, invoice) => sum + invoice.total_amount, 0);
+      series.push({ label, value });
+    }
+    return series;
+  }, [invoices]);
+
+  const maxValue = Math.max(...monthlySeries.map((item) => item.value), 1);
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-cloud via-white to-[#E6F6F5] text-ink">
+      <div className="relative overflow-hidden">
+        <div className="absolute -left-32 -top-28 h-80 w-80 rounded-full bg-ember/20 blur-3xl" />
+        <div className="absolute right-0 top-10 h-72 w-72 rounded-full bg-moss/15 blur-3xl" />
+        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-[#C7EFEB]/30 blur-3xl" />
+
+        <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-10 px-6 py-10">
+          <DashboardHeader user={user} />
+
+          <DashboardNav activeSection={null} onSelect={(section) => navigate(`/app?section=${section}`)} />
+
+          {status && (
+            <div className="rounded-2xl border border-ember/30 bg-white/70 px-6 py-4 text-sm text-slate shadow-glow">
+              {status}
+            </div>
+          )}
+
+          <section className="grid gap-6 lg:grid-cols-3">
+            <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
+              <p className="text-xs uppercase tracking-[0.2em] text-haze">Total revenue</p>
+              <p className="mt-3 text-2xl font-semibold text-ink">EUR {totals.totalRevenue.toFixed(2)}</p>
+              <p className="mt-2 text-sm text-slate">All invoices to date.</p>
+            </div>
+            <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
+              <p className="text-xs uppercase tracking-[0.2em] text-haze">Invoices</p>
+              <p className="mt-3 text-2xl font-semibold text-ink">{invoices.length}</p>
+              <p className="mt-2 text-sm text-slate">Average EUR {totals.avgInvoice.toFixed(2)}.</p>
+            </div>
+            <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
+              <p className="text-xs uppercase tracking-[0.2em] text-haze">This month</p>
+              <p className="mt-3 text-2xl font-semibold text-ink">EUR {totals.monthRevenue.toFixed(2)}</p>
+              <p className="mt-2 text-sm text-slate">Revenue in the current month.</p>
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
+            <div className="flex items-center justify-between">
+              <h3 className="font-display text-xl">Income trend</h3>
+              <span className="text-xs uppercase tracking-[0.2em] text-haze">Last 6 months</span>
+            </div>
+            <div className="mt-6 grid gap-4 md:grid-cols-6">
+              {monthlySeries.map((item) => (
+                <div key={item.label} className="flex flex-col items-center gap-2 text-xs text-slate">
+                  <div className="relative h-36 w-10 rounded-full bg-ink/5">
+                    <div
+                      className="absolute bottom-0 w-10 rounded-full bg-ember/70"
+                      style={{ height: `${(item.value / maxValue) * 100}%` }}
+                    />
+                  </div>
+                  <span>{item.label}</span>
+                  <span className="text-[11px] text-haze">EUR {item.value.toFixed(0)}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  );
+}
