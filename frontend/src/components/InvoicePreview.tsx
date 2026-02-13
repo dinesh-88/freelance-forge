@@ -1,4 +1,5 @@
 import type { Invoice } from "../lib/api";
+import { currencySymbol } from "../lib/currency";
 
 export default function InvoicePreview({
   invoice,
@@ -23,7 +24,7 @@ export default function InvoicePreview({
           <p className="text-sm text-slate">{invoice.client_address}</p>
           <div className="flex items-center justify-between">
             <span className="rounded-full bg-ink/5 px-3 py-1 text-xs font-semibold text-ink">
-              {invoice.currency} {invoice.total_amount.toFixed(2)}
+              {currencySymbol(invoice.currency)} {invoice.total_amount.toFixed(2)}
             </span>
             <span className="text-xs text-haze">{invoice.date}</span>
           </div>

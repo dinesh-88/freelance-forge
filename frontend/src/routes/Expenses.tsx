@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import type { Expense, User } from "../lib/api";
 import DashboardHeader from "../components/DashboardHeader";
 import DashboardNav from "../components/DashboardNav";
+import { currencySymbol } from "../lib/currency";
 
 export default function Expenses() {
   const navigate = useNavigate();
@@ -166,7 +167,9 @@ export default function Expenses() {
               <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
                 <div className="flex items-center justify-between">
                   <h3 className="font-display text-xl">Add expense</h3>
-                  <span className="text-xs text-haze">Total EUR {totalExpenses.toFixed(2)}</span>
+                  <span className="text-xs text-haze">
+                    Total {currencySymbol("EUR")} {totalExpenses.toFixed(2)}
+                  </span>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <input
@@ -259,7 +262,7 @@ export default function Expenses() {
                         <p className="text-xs text-haze">{expense.date}</p>
                       </div>
                       <span className="text-sm font-semibold text-ink">
-                        {expense.currency} {expense.amount.toFixed(2)}
+                        {currencySymbol(expense.currency)} {expense.amount.toFixed(2)}
                       </span>
                     </div>
                     <p className="mt-2 text-sm text-slate">{expense.description}</p>

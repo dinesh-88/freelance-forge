@@ -1,4 +1,5 @@
 import type { Company, InvoiceTemplate } from "../lib/api";
+import { currencySymbol } from "../lib/currency";
 
 export default function InvoiceForm({
   invoiceForm,
@@ -271,7 +272,7 @@ export default function InvoiceForm({
           <div className="mt-4 flex items-center justify-between text-sm">
             <span className="text-haze">Total</span>
             <span className="font-semibold text-ink">
-              {invoiceForm.currency} {invoiceTotal.toFixed(2)}
+              {currencySymbol(invoiceForm.currency)} {invoiceTotal.toFixed(2)}
             </span>
           </div>
         </div>

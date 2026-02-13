@@ -777,6 +777,13 @@ fn build_invoice_pdf(
             .unwrap_or_else(|_| input.to_string())
     };
 
+    let symbol = match invoice.currency.as_str() {
+        "USD" => "$",
+        "GBP" => "£",
+        "EUR" => "€",
+        _ => "€",
+    };
+
     let html = if template.is_custom {
         let template_html = render(&template.html);
         if template_html.to_lowercase().contains("<html") {
@@ -882,6 +889,10 @@ fn build_invoice_pdf(
             .render_template(&html_template, &ctx)
             .unwrap_or_else(|_| html_template)
     };
+
+    let html = html
+        .replace("{{currency}}", &invoice.currency)
+        .replace("{{currency_symbol}}", symbol);
 
     let mut child = Command::new("wkhtmltopdf")
         .args(["-q", "--encoding", "utf-8", "-", "-"])

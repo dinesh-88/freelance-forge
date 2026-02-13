@@ -1,4 +1,5 @@
 import type { Invoice } from "../lib/api";
+import { currencySymbol } from "../lib/currency";
 
 export default function InvoiceTable({
   invoices,
@@ -38,7 +39,7 @@ export default function InvoiceTable({
                 </td>
                 <td className="py-3 font-semibold text-ink">{item.client_name}</td>
                 <td className="py-3">
-                  {item.currency} {(item.total_amount ?? item.amount).toFixed(2)}
+                  {currencySymbol(item.currency)} {(item.total_amount ?? item.amount).toFixed(2)}
                 </td>
                 <td className="py-3">{item.date}</td>
                 <td className="py-3 text-right">

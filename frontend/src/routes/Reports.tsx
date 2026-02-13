@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import type { Expense, Invoice, User } from "../lib/api";
 import DashboardHeader from "../components/DashboardHeader";
 import DashboardNav from "../components/DashboardNav";
+import { currencySymbol } from "../lib/currency";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -179,12 +180,16 @@ export default function Reports() {
             </div>
             <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
               <p className="text-xs uppercase tracking-[0.2em] text-haze">Total revenue</p>
-              <p className="mt-3 text-2xl font-semibold text-ink">EUR {totals.totalRevenue.toFixed(2)}</p>
+              <p className="mt-3 text-2xl font-semibold text-ink">
+                {currencySymbol("EUR")} {totals.totalRevenue.toFixed(2)}
+              </p>
               <p className="mt-2 text-sm text-slate">All invoices to date.</p>
             </div>
             <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
               <p className="text-xs uppercase tracking-[0.2em] text-haze">Total expenses</p>
-              <p className="mt-3 text-2xl font-semibold text-ink">EUR {totals.totalExpenses.toFixed(2)}</p>
+              <p className="mt-3 text-2xl font-semibold text-ink">
+                {currencySymbol("EUR")} {totals.totalExpenses.toFixed(2)}
+              </p>
               <p className="mt-2 text-sm text-slate">Expenses recorded.</p>
             </div>
             <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
@@ -195,10 +200,10 @@ export default function Reports() {
             <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
               <p className="text-xs uppercase tracking-[0.2em] text-haze">This month</p>
               <p className="mt-3 text-2xl font-semibold text-ink">
-                EUR {(totals.monthRevenue - totals.monthExpenses).toFixed(2)}
+                {currencySymbol("EUR")} {(totals.monthRevenue - totals.monthExpenses).toFixed(2)}
               </p>
               <p className="mt-2 text-sm text-slate">
-                Revenue EUR {totals.monthRevenue.toFixed(2)} · Expenses EUR {totals.monthExpenses.toFixed(2)}
+                Revenue {currencySymbol("EUR")} {totals.monthRevenue.toFixed(2)} · Expenses {currencySymbol("EUR")} {totals.monthExpenses.toFixed(2)}
               </p>
             </div>
           </section>
@@ -218,7 +223,9 @@ export default function Reports() {
                     />
                   </div>
                   <span>{item.label}</span>
-                  <span className="text-[11px] text-haze">EUR {item.value.toFixed(0)}</span>
+                  <span className="text-[11px] text-haze">
+                    {currencySymbol("EUR")} {item.value.toFixed(0)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -246,19 +253,19 @@ export default function Reports() {
               <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-haze">Income</p>
                 <p className="mt-2 text-lg font-semibold text-ink">
-                  EUR {yearlyTotals.totalRevenue.toFixed(2)}
+                  {currencySymbol("EUR")} {yearlyTotals.totalRevenue.toFixed(2)}
                 </p>
               </div>
               <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-haze">Expenses</p>
                 <p className="mt-2 text-lg font-semibold text-ink">
-                  EUR {yearlyTotals.totalExpenses.toFixed(2)}
+                  {currencySymbol("EUR")} {yearlyTotals.totalExpenses.toFixed(2)}
                 </p>
               </div>
               <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-haze">Net</p>
                 <p className="mt-2 text-lg font-semibold text-ink">
-                  EUR {yearlyTotals.net.toFixed(2)}
+                  {currencySymbol("EUR")} {yearlyTotals.net.toFixed(2)}
                 </p>
               </div>
             </div>
