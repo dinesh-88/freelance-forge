@@ -18,6 +18,7 @@ export default function Reports() {
     start: `${currentYear}-01-01`,
     end: `${currentYear}-12-31`,
   });
+  const [summaryYear, setSummaryYear] = useState(String(currentYear));
 
   useEffect(() => {
     void loadSession();
@@ -100,6 +101,29 @@ export default function Reports() {
     }
     return series;
   }, [invoices, range]);
+
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    invoices.forEach((invoice) => years.add(new Date(invoice.date).getFullYear()));
+    expenses.forEach((expense) => years.add(new Date(expense.date).getFullYear()));
+    years.add(currentYear);
+    return Array.from(years).sort((a, b) => b - a);
+  }, [invoices, expenses, currentYear]);
+
+  const yearlyTotals = useMemo(() => {
+    const year = Number(summaryYear);
+    const totalRevenue = invoices
+      .filter((invoice) => new Date(invoice.date).getFullYear() === year)
+      .reduce((sum, invoice) => sum + invoice.total_amount, 0);
+    const totalExpenses = expenses
+      .filter((expense) => new Date(expense.date).getFullYear() === year)
+      .reduce((sum, expense) => sum + expense.amount, 0);
+    return {
+      totalRevenue,
+      totalExpenses,
+      net: totalRevenue - totalExpenses,
+    };
+  }, [invoices, expenses, summaryYear]);
 
   const maxValue = Math.max(...monthlySeries.map((item) => item.value), 1);
 
@@ -190,6 +214,46 @@ export default function Reports() {
                   <span className="text-[11px] text-haze">EUR {item.value.toFixed(0)}</span>
                 </div>
               ))}
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <h3 className="font-display text-xl">Yearly summary</h3>
+              <div className="flex items-center gap-3 text-sm">
+                <label className="text-xs uppercase tracking-[0.2em] text-haze">Year</label>
+                <select
+                  className="rounded-xl border border-ink/10 bg-white/80 px-3 py-2"
+                  value={summaryYear}
+                  onChange={(event) => setSummaryYear(event.target.value)}
+                >
+                  {availableYears.map((year) => (
+                    <option key={year} value={String(year)}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-haze">Income</p>
+                <p className="mt-2 text-lg font-semibold text-ink">
+                  EUR {yearlyTotals.totalRevenue.toFixed(2)}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-haze">Expenses</p>
+                <p className="mt-2 text-lg font-semibold text-ink">
+                  EUR {yearlyTotals.totalExpenses.toFixed(2)}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-ink/10 bg-white/80 p-4">
+                <p className="text-xs uppercase tracking-[0.2em] text-haze">Net</p>
+                <p className="mt-2 text-lg font-semibold text-ink">
+                  EUR {yearlyTotals.net.toFixed(2)}
+                </p>
+              </div>
             </div>
           </section>
         </main>
