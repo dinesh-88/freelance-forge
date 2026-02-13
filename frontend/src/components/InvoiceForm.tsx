@@ -225,46 +225,48 @@ export default function InvoiceForm({
                     onChange({ ...invoiceForm, items: next });
                   }}
                 />
-                <label className="flex items-center gap-2 text-xs text-haze md:col-span-4">
-                  <input
-                    type="checkbox"
-                    checked={item.use_quantity}
-                    onChange={(event) => {
-                      const next = [...invoiceForm.items];
-                      next[index] = {
-                        ...next[index],
-                        use_quantity: event.target.checked,
-                        quantity: event.target.checked ? next[index].quantity : 1,
-                      };
-                      onChange({ ...invoiceForm, items: next });
+                <div className="flex items-center justify-between md:col-span-4">
+                  <label className="flex items-center gap-2 text-xs text-haze">
+                    <input
+                      type="checkbox"
+                      checked={item.use_quantity}
+                      onChange={(event) => {
+                        const next = [...invoiceForm.items];
+                        next[index] = {
+                          ...next[index],
+                          use_quantity: event.target.checked,
+                          quantity: event.target.checked ? next[index].quantity : 1,
+                        };
+                        onChange({ ...invoiceForm, items: next });
+                      }}
+                    />
+                    Use qty × unit
+                  </label>
+                  <button
+                    className="rounded-xl border border-ink/10 px-3 py-2 text-xs font-semibold"
+                    onClick={() => {
+                      const next = invoiceForm.items.filter((_, i) => i !== index);
+                      onChange({
+                        ...invoiceForm,
+                        items:
+                          next.length > 0
+                            ? next
+                            : [
+                                {
+                                  id: crypto.randomUUID(),
+                                  description: "",
+                                  quantity: 1,
+                                  unit_price: 0,
+                                  use_quantity: true,
+                                },
+                              ],
+                      });
                     }}
-                  />
-                  Use qty × unit
-                </label>
-                <button
-                  className="rounded-xl border border-ink/10 px-3 py-2 text-xs font-semibold"
-                  onClick={() => {
-                    const next = invoiceForm.items.filter((_, i) => i !== index);
-                    onChange({
-                      ...invoiceForm,
-                      items:
-                        next.length > 0
-                          ? next
-                          : [
-                              {
-                                id: crypto.randomUUID(),
-                                description: "",
-                                quantity: 1,
-                                unit_price: 0,
-                                use_quantity: true,
-                              },
-                            ],
-                    });
-                  }}
-                  type="button"
-                >
-                  Remove
-                </button>
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>
