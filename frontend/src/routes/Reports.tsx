@@ -13,6 +13,11 @@ export default function Reports() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [status, setStatus] = useState<string | null>(null);
+  const currentYear = new Date().getFullYear();
+  const [range, setRange] = useState({
+    start: `${currentYear}-01-01`,
+    end: `${currentYear}-12-31`,
+  });
 
   useEffect(() => {
     void loadSession();
@@ -40,8 +45,18 @@ export default function Reports() {
   }
 
   const totals = useMemo(() => {
-    const totalRevenue = invoices.reduce((sum, invoice) => sum + invoice.total_amount, 0);
-    const totalExpenses = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+    const start = new Date(range.start);
+    const end = new Date(range.end);
+    const inRange = (dateValue: string) => {
+      const date = new Date(dateValue);
+      return date >= start && date <= end;
+    };
+    const totalRevenue = invoices
+      .filter((invoice) => inRange(invoice.date))
+      .reduce((sum, invoice) => sum + invoice.total_amount, 0);
+    const totalExpenses = expenses
+      .filter((expense) => inRange(expense.date))
+      .reduce((sum, expense) => sum + expense.amount, 0);
     const avgInvoice = invoices.length ? totalRevenue / invoices.length : 0;
     const now = new Date();
     const currentMonth = now.getMonth();
@@ -65,7 +80,7 @@ export default function Reports() {
       monthRevenue,
       monthExpenses,
     };
-  }, [invoices, expenses]);
+  }, [invoices, expenses, range]);
 
   const monthlySeries = useMemo(() => {
     const now = new Date();
@@ -76,13 +91,15 @@ export default function Reports() {
       const value = invoices
         .filter((invoice) => {
           const date = new Date(invoice.date);
-          return date.getFullYear() === target.getFullYear() && date.getMonth() === target.getMonth();
+          const inMonth = date.getFullYear() === target.getFullYear() && date.getMonth() === target.getMonth();
+          const inRange = date >= new Date(range.start) && date <= new Date(range.end);
+          return inMonth && inRange;
         })
         .reduce((sum, invoice) => sum + invoice.total_amount, 0);
       series.push({ label, value });
     }
     return series;
-  }, [invoices]);
+  }, [invoices, range]);
 
   const maxValue = Math.max(...monthlySeries.map((item) => item.value), 1);
 
@@ -104,7 +121,31 @@ export default function Reports() {
             </div>
           )}
 
-          <section className="grid gap-6 lg:grid-cols-4">
+          <section className="grid gap-6 lg:grid-cols-[1.2fr_1fr_1fr_1fr]">
+            <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift lg:col-span-4">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-haze">Date range</p>
+                  <p className="mt-2 text-sm text-slate">
+                    Reporting for {range.start} → {range.end}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <input
+                    className="rounded-xl border border-ink/10 bg-white/80 px-3 py-2 text-sm"
+                    type="date"
+                    value={range.start}
+                    onChange={(event) => setRange((prev) => ({ ...prev, start: event.target.value }))}
+                  />
+                  <input
+                    className="rounded-xl border border-ink/10 bg-white/80 px-3 py-2 text-sm"
+                    type="date"
+                    value={range.end}
+                    onChange={(event) => setRange((prev) => ({ ...prev, end: event.target.value }))}
+                  />
+                </div>
+              </div>
+            </div>
             <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
               <p className="text-xs uppercase tracking-[0.2em] text-haze">Total revenue</p>
               <p className="mt-3 text-2xl font-semibold text-ink">EUR {totals.totalRevenue.toFixed(2)}</p>
