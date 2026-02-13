@@ -48,6 +48,7 @@ export default function Invoices() {
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(null);
   const currentYear = new Date().getFullYear();
   const [filterYear, setFilterYear] = useState(String(currentYear));
+  const [sortKey, setSortKey] = useState("date_desc");
 
   const hasAddress = useMemo(() => Boolean(user?.address), [user]);
   const invoiceTotal = useMemo(
@@ -74,6 +75,32 @@ export default function Invoices() {
     const year = Number(filterYear);
     return invoices.filter((invoice) => new Date(invoice.date).getFullYear() === year);
   }, [invoices, filterYear]);
+
+  const sortedInvoices = useMemo(() => {
+    const data = [...filteredInvoices];
+    switch (sortKey) {
+      case "date_asc":
+        data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        break;
+      case "amount_desc":
+        data.sort((a, b) => (b.total_amount ?? b.amount) - (a.total_amount ?? a.amount));
+        break;
+      case "amount_asc":
+        data.sort((a, b) => (a.total_amount ?? a.amount) - (b.total_amount ?? b.amount));
+        break;
+      case "client_asc":
+        data.sort((a, b) => a.client_name.localeCompare(b.client_name));
+        break;
+      case "client_desc":
+        data.sort((a, b) => b.client_name.localeCompare(a.client_name));
+        break;
+      case "date_desc":
+      default:
+        data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        break;
+    }
+    return data;
+  }, [filteredInvoices, sortKey]);
 
   useEffect(() => {
     void loadSession();
@@ -353,10 +380,23 @@ export default function Invoices() {
                       </option>
                     ))}
                   </select>
+                  <label className="text-xs uppercase tracking-[0.2em] text-haze">Sort</label>
+                  <select
+                    className="rounded-xl border border-ink/10 bg-white/80 px-3 py-2"
+                    value={sortKey}
+                    onChange={(event) => setSortKey(event.target.value)}
+                  >
+                    <option value="date_desc">Date (newest)</option>
+                    <option value="date_asc">Date (oldest)</option>
+                    <option value="amount_desc">Amount (high → low)</option>
+                    <option value="amount_asc">Amount (low → high)</option>
+                    <option value="client_asc">Client (A → Z)</option>
+                    <option value="client_desc">Client (Z → A)</option>
+                  </select>
                 </div>
               </div>
               <InvoiceTable
-                invoices={filteredInvoices}
+                invoices={sortedInvoices}
                 onView={setInvoiceResult}
                 onEdit={handleInvoiceEdit}
                 onDuplicate={handleInvoiceDuplicate}
