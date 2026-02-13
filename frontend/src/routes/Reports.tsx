@@ -84,20 +84,27 @@ export default function Reports() {
   }, [invoices, expenses, range]);
 
   const monthlySeries = useMemo(() => {
-    const now = new Date();
+    const startDate = new Date(range.start);
+    const endDate = new Date(range.end);
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      return [];
+    }
+    const start = startDate <= endDate ? startDate : endDate;
+    const end = startDate <= endDate ? endDate : startDate;
+
     const series: Array<{ label: string; value: number }> = [];
-    for (let i = 5; i >= 0; i -= 1) {
-      const target = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const label = `${MONTHS[target.getMonth()]} ${String(target.getFullYear()).slice(-2)}`;
+    const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+    const last = new Date(end.getFullYear(), end.getMonth(), 1);
+    while (cursor <= last) {
+      const label = `${MONTHS[cursor.getMonth()]} ${String(cursor.getFullYear()).slice(-2)}`;
       const value = invoices
         .filter((invoice) => {
           const date = new Date(invoice.date);
-          const inMonth = date.getFullYear() === target.getFullYear() && date.getMonth() === target.getMonth();
-          const inRange = date >= new Date(range.start) && date <= new Date(range.end);
-          return inMonth && inRange;
+          return date.getFullYear() === cursor.getFullYear() && date.getMonth() === cursor.getMonth();
         })
         .reduce((sum, invoice) => sum + invoice.total_amount, 0);
       series.push({ label, value });
+      cursor.setMonth(cursor.getMonth() + 1);
     }
     return series;
   }, [invoices, range]);
@@ -199,9 +206,9 @@ export default function Reports() {
           <section className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
             <div className="flex items-center justify-between">
               <h3 className="font-display text-xl">Income trend</h3>
-              <span className="text-xs uppercase tracking-[0.2em] text-haze">Last 6 months</span>
+              <span className="text-xs uppercase tracking-[0.2em] text-haze">Range trend</span>
             </div>
-            <div className="mt-6 grid gap-4 md:grid-cols-6">
+            <div className="mt-6 grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))" }}>
               {monthlySeries.map((item) => (
                 <div key={item.label} className="flex flex-col items-center gap-2 text-xs text-slate">
                   <div className="relative h-36 w-10 rounded-full bg-ink/5">
