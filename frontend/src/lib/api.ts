@@ -56,6 +56,15 @@ export type ReceiptUpload = {
   receipt_url: string;
 };
 
+export type LineItemImprove = {
+  suggestion: string;
+  based_on?: string | null;
+};
+
+export type LastLineItem = {
+  description?: string | null;
+};
+
 export type InvoiceTemplate = {
   id: string;
   name: string;
@@ -225,4 +234,10 @@ export const api = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  improveLineItem: (payload: { description: string }) =>
+    fetchJson<LineItemImprove>("/ai/line-item-improve", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  lastLineItem: () => fetchJson<LastLineItem>("/ai/line-item-last"),
 };

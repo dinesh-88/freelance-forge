@@ -15,6 +15,10 @@ use modules::auth::{
     logout, me, register, update_profile, LoginRequest, RegisterRequest, SessionResponse,
     UpdateProfileRequest, UserResponse,
 };
+use modules::ai::{
+    __path_improve_line_item, __path_last_line_item, improve_line_item, last_line_item,
+    ImproveLineItemRequest, ImproveLineItemResponse, LastLineItemResponse,
+};
 use modules::company::{
     __path_create_company, __path_get_my_company, __path_list_companies, __path_update_company,
     create_company, get_my_company, list_companies, update_company, CompanyCreateRequest,
@@ -58,6 +62,8 @@ use modules::shared::AppState;
         update_expense,
         delete_expense,
         create_receipt_upload_url,
+        improve_line_item,
+        last_line_item,
         register,
         update_profile,
         login,
@@ -80,6 +86,9 @@ use modules::shared::AppState;
         ExpenseResponse,
         ReceiptUploadRequest,
         ReceiptUploadResponse,
+        ImproveLineItemRequest,
+        ImproveLineItemResponse,
+        LastLineItemResponse,
         RegisterRequest,
         LoginRequest,
         UpdateProfileRequest,
@@ -91,7 +100,8 @@ use modules::shared::AppState;
         (name = "invoices", description = "Invoice management"),
         (name = "auth", description = "Authentication"),
         (name = "company", description = "Company onboarding"),
-        (name = "expenses", description = "Expense management")
+        (name = "expenses", description = "Expense management"),
+        (name = "ai", description = "AI helpers")
     )
 )]
 struct ApiDoc;
@@ -126,6 +136,8 @@ async fn main() -> anyhow::Result<()> {
         .route("/expenses/:id", axum::routing::patch(update_expense))
         .route("/expenses/:id", axum::routing::delete(delete_expense))
         .route("/expenses/receipt-url", post(create_receipt_upload_url))
+        .route("/ai/line-item-improve", post(improve_line_item))
+        .route("/ai/line-item-last", get(last_line_item))
         .route("/auth/register", post(register))
         .route("/auth/login", post(login))
         .route("/auth/logout", post(logout))

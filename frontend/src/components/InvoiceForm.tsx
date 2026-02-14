@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { api } from "../lib/api";
 import type { Company, InvoiceTemplate } from "../lib/api";
 import { currencySymbol } from "../lib/currency";
 
@@ -54,6 +56,10 @@ export default function InvoiceForm({
   onUpdate: () => void;
   onNew: () => void;
 }) {
+  const [aiLoadingId, setAiLoadingId] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [lastLoadingId, setLastLoadingId] = useState<string | null>(null);
+
   return (
     <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -185,16 +191,72 @@ export default function InvoiceForm({
                 key={item.id}
                 className="grid gap-3 md:grid-cols-[2fr_1fr_1fr_auto]"
               >
-                <input
-                  className="rounded-xl border border-ink/10 bg-white/80 px-3 py-2"
-                  placeholder="Description"
-                  value={item.description}
-                  onChange={(event) => {
-                    const next = [...invoiceForm.items];
-                    next[index] = { ...next[index], description: event.target.value };
-                    onChange({ ...invoiceForm, items: next });
-                  }}
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    className="w-full rounded-xl border border-ink/10 bg-white/80 px-3 py-2"
+                    placeholder="Description"
+                    value={item.description}
+                    onChange={(event) => {
+                      const next = [...invoiceForm.items];
+                      next[index] = { ...next[index], description: event.target.value };
+                      onChange({ ...invoiceForm, items: next });
+                    }}
+                  />
+                  <button
+                    className="rounded-lg border border-ink/10 px-3 py-2 text-xs font-semibold"
+                    type="button"
+                    disabled={lastLoadingId === item.id}
+                    onClick={async () => {
+                      setAiError(null);
+                      setLastLoadingId(item.id);
+                      const result = await api.lastLineItem();
+                      setLastLoadingId(null);
+                      if (!result.ok) {
+                        setAiError(result.error);
+                        return;
+                      }
+                      const last = result.data.description;
+                      if (!last) {
+                        setAiError("No previous line-item found.");
+                        return;
+                      }
+                      const now = new Date();
+                      const month = now.toLocaleString("en-US", { month: "long" });
+                      const year = String(now.getFullYear());
+                      const monthRegex = /January|February|March|April|May|June|July|August|September|October|November|December/g;
+                      const nextDescription = last
+                        .replace(monthRegex, month)
+                        .replace(/\b20\d{2}\b/g, year);
+                      const next = [...invoiceForm.items];
+                      next[index] = { ...next[index], description: nextDescription };
+                      onChange({ ...invoiceForm, items: next });
+                    }}
+                  >
+                    {lastLoadingId === item.id ? "Using..." : "Last"}
+                  </button>
+                  <button
+                    className="rounded-lg border border-ink/10 px-3 py-2 text-xs font-semibold"
+                    type="button"
+                    disabled={aiLoadingId === item.id || !item.description.trim()}
+                    onClick={async () => {
+                      setAiError(null);
+                      setAiLoadingId(item.id);
+                      const result = await api.improveLineItem({
+                        description: item.description,
+                      });
+                      setAiLoadingId(null);
+                      if (!result.ok) {
+                        setAiError(result.error);
+                        return;
+                      }
+                      const next = [...invoiceForm.items];
+                      next[index] = { ...next[index], description: result.data.suggestion };
+                      onChange({ ...invoiceForm, items: next });
+                    }}
+                  >
+                    {aiLoadingId === item.id ? "Improving..." : "AI"}
+                  </button>
+                </div>
                 <input
                   className="rounded-xl border border-ink/10 bg-white/80 px-3 py-2"
                   type="number"
@@ -269,6 +331,11 @@ export default function InvoiceForm({
               </div>
             ))}
           </div>
+          {aiError && (
+            <p className="mt-3 text-xs text-ember">
+              {aiError}
+            </p>
+          )}
           <div className="mt-4 flex items-center justify-between text-sm">
             <span className="text-haze">Total</span>
             <span className="font-semibold text-ink">

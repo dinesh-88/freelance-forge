@@ -646,6 +646,7 @@ dependencies = [
  "chrono",
  "dotenv",
  "handlebars",
+ "reqwest",
  "sea-orm",
  "sea-orm-migration",
  "serde",
