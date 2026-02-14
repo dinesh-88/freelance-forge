@@ -59,7 +59,8 @@ export default function Reports() {
     const totalExpenses = expenses
       .filter((expense) => inRange(expense.date))
       .reduce((sum, expense) => sum + expense.amount, 0);
-    const avgInvoice = invoices.length ? totalRevenue / invoices.length : 0;
+    const rangedInvoices = invoices.filter((invoice) => inRange(invoice.date));
+    const avgInvoice = rangedInvoices.length ? totalRevenue / rangedInvoices.length : 0;
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();

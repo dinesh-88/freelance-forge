@@ -178,12 +178,20 @@ export default function Expenses() {
                     value={form.vendor}
                     onChange={(event) => setForm({ ...form, vendor: event.target.value })}
                   />
-                  <input
+                  <select
                     className="rounded-xl border border-ink/10 bg-white/80 px-4 py-3"
-                    placeholder="Category"
                     value={form.category}
                     onChange={(event) => setForm({ ...form, category: event.target.value })}
-                  />
+                  >
+                    <option value="">Select category</option>
+                    <option value="Travel">Travel</option>
+                    <option value="Software">Software</option>
+                    <option value="Hardware">Hardware</option>
+                    <option value="Office">Office</option>
+                    <option value="Marketing">Marketing</option>
+                    <option value="Services">Services</option>
+                    <option value="Other">Other</option>
+                  </select>
                   <textarea
                     className="md:col-span-2 rounded-xl border border-ink/10 bg-white/80 px-4 py-3"
                     placeholder="Description"
@@ -252,56 +260,77 @@ export default function Expenses() {
             </div>
 
             <div className="rounded-3xl border border-white/70 bg-white/80 p-6 shadow-lift">
-              <h3 className="font-display text-xl">Expenses</h3>
-              <div className="mt-4 space-y-3">
-                {expenses.map((expense) => (
-                  <div key={expense.id} className="rounded-2xl border border-ink/10 bg-white/80 p-4">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-ink">{expense.vendor}</p>
-                        <p className="text-xs text-haze">{expense.date}</p>
-                      </div>
-                      <span className="text-sm font-semibold text-ink">
-                        {currencySymbol(expense.currency)} {expense.amount.toFixed(2)}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-slate">{expense.description}</p>
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                      {expense.category && (
-                        <span className="rounded-full bg-ink/5 px-2 py-1 text-ink">
-                          {expense.category}
-                        </span>
-                      )}
-                      {expense.receipt_url && (
-                        <a
-                          className="font-semibold text-ember"
-                          href={expense.receipt_url}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Receipt
-                        </a>
-                      )}
-                      <button
-                        className="ml-auto rounded-lg border border-ink/10 px-2 py-1"
-                        onClick={() => handleEdit(expense)}
-                        type="button"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="rounded-lg border border-ink/10 px-2 py-1"
-                        onClick={() => handleDelete(expense.id)}
-                        type="button"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {expenses.length === 0 && (
-                  <p className="text-sm text-haze">No expenses yet.</p>
-                )}
+              <div className="flex items-center justify-between">
+                <h3 className="font-display text-xl">Expenses</h3>
+                <span className="text-xs text-haze">{expenses.length} total</span>
+              </div>
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className="text-xs uppercase tracking-[0.2em] text-haze">
+                    <tr>
+                      <th className="pb-2">Vendor</th>
+                      <th className="pb-2">Category</th>
+                      <th className="pb-2">Amount</th>
+                      <th className="pb-2">Date</th>
+                      <th className="pb-2 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-slate">
+                    {expenses.map((expense) => (
+                      <tr key={expense.id} className="border-t border-ink/10">
+                        <td className="py-3 font-semibold text-ink">{expense.vendor}</td>
+                        <td className="py-3">
+                          {expense.category ? (
+                            <span className="rounded-full bg-ink/5 px-2 py-1 text-xs text-ink">
+                              {expense.category}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-haze">—</span>
+                          )}
+                        </td>
+                        <td className="py-3">
+                          {currencySymbol(expense.currency)} {expense.amount.toFixed(2)}
+                        </td>
+                        <td className="py-3">{expense.date}</td>
+                        <td className="py-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {expense.receipt_url && (
+                              <a
+                                className="rounded-lg border border-ink/10 px-3 py-1 text-xs font-semibold"
+                                href={expense.receipt_url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Receipt
+                              </a>
+                            )}
+                            <button
+                              className="rounded-lg border border-ink/10 px-3 py-1 text-xs font-semibold"
+                              onClick={() => handleEdit(expense)}
+                              type="button"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              className="rounded-lg border border-ink/10 px-3 py-1 text-xs font-semibold"
+                              onClick={() => handleDelete(expense.id)}
+                              type="button"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {expenses.length === 0 && (
+                      <tr>
+                        <td className="py-4 text-sm text-haze" colSpan={5}>
+                          No expenses yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </section>
