@@ -1,3 +1,4 @@
+pub mod budget;
 pub mod company;
 pub mod expense;
 pub mod income;

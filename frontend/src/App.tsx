@@ -8,6 +8,7 @@ import Reports from "./routes/Reports";
 import Expenses from "./routes/Expenses";
 import IncomePage from "./routes/Income";
 import Tracker from "./routes/Tracker";
+import Budgets from "./routes/Budgets";
 
 export default function App() {
   return (
@@ -19,6 +20,7 @@ export default function App() {
       <Route path="/app/expenses" element={<Expenses />} />
       <Route path="/app/income" element={<IncomePage />} />
       <Route path="/app/tracker" element={<Tracker />} />
+      <Route path="/app/budgets" element={<Budgets />} />
       <Route path="/app/templates" element={<Templates />} />
       <Route path="/404" element={<NotFound />} />
       <Route path="*" element={<Navigate to="/404" replace />} />

@@ -19,6 +19,11 @@ use modules::ai::{
     __path_improve_line_item, __path_last_line_item, improve_line_item, last_line_item,
     ImproveLineItemRequest, ImproveLineItemResponse, LastLineItemResponse,
 };
+use modules::budget::{
+    __path_create_budget, __path_delete_budget, __path_list_budgets, __path_update_budget,
+    create_budget, delete_budget, list_budgets, update_budget, BudgetCreateRequest,
+    BudgetResponse, BudgetUpdateRequest,
+};
 use modules::company::{
     __path_create_company, __path_get_my_company, __path_list_companies, __path_update_company,
     create_company, get_my_company, list_companies, update_company, CompanyCreateRequest,
@@ -71,6 +76,10 @@ use modules::shared::AppState;
         create_income,
         update_income,
         delete_income,
+        list_budgets,
+        create_budget,
+        update_budget,
+        delete_budget,
         improve_line_item,
         last_line_item,
         register,
@@ -98,6 +107,9 @@ use modules::shared::AppState;
         IncomeCreateRequest,
         IncomeUpdateRequest,
         IncomeResponse,
+        BudgetCreateRequest,
+        BudgetUpdateRequest,
+        BudgetResponse,
         ImproveLineItemRequest,
         ImproveLineItemResponse,
         LastLineItemResponse,
@@ -114,6 +126,7 @@ use modules::shared::AppState;
         (name = "company", description = "Company onboarding"),
         (name = "expenses", description = "Expense management"),
         (name = "income", description = "Income management"),
+        (name = "budgets", description = "Budget management"),
         (name = "ai", description = "AI helpers")
     )
 )]
@@ -153,6 +166,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/income", post(create_income))
         .route("/income/:id", axum::routing::patch(update_income))
         .route("/income/:id", axum::routing::delete(delete_income))
+        .route("/budgets", get(list_budgets))
+        .route("/budgets", post(create_budget))
+        .route("/budgets/:id", axum::routing::patch(update_budget))
+        .route("/budgets/:id", axum::routing::delete(delete_budget))
         .route("/ai/line-item-improve", post(improve_line_item))
         .route("/ai/line-item-last", get(last_line_item))
         .route("/auth/register", post(register))

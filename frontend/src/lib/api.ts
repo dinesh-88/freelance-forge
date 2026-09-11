@@ -61,6 +61,13 @@ export type Income = {
   category?: string | null;
 };
 
+export type Budget = {
+  id: string;
+  category: string;
+  monthly_limit: number;
+  currency: string;
+};
+
 export type ReceiptUpload = {
   upload_url: string;
   receipt_url: string;
@@ -274,6 +281,24 @@ export const api = {
     }),
   deleteIncome: (id: string) =>
     fetchJson<void>(`/income/${id}`, {
+      method: "DELETE",
+    }),
+  listBudgets: () => fetchJson<Budget[]>("/budgets"),
+  createBudget: (payload: { category: string; monthly_limit: number; currency: string }) =>
+    fetchJson<Budget>("/budgets", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateBudget: (
+    id: string,
+    payload: Partial<{ monthly_limit: number; currency: string }>
+  ) =>
+    fetchJson<Budget>(`/budgets/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteBudget: (id: string) =>
+    fetchJson<void>(`/budgets/${id}`, {
       method: "DELETE",
     }),
   improveLineItem: (payload: { description: string }) =>
