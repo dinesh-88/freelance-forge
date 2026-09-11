@@ -6,6 +6,8 @@ import Templates from "./routes/Templates";
 import Invoices from "./routes/Invoices";
 import Reports from "./routes/Reports";
 import Expenses from "./routes/Expenses";
+import IncomePage from "./routes/Income";
+import Tracker from "./routes/Tracker";
 
 export default function App() {
   return (
@@ -15,6 +17,8 @@ export default function App() {
       <Route path="/app/invoices" element={<Invoices />} />
       <Route path="/app/reports" element={<Reports />} />
       <Route path="/app/expenses" element={<Expenses />} />
+      <Route path="/app/income" element={<IncomePage />} />
+      <Route path="/app/tracker" element={<Tracker />} />
       <Route path="/app/templates" element={<Templates />} />
       <Route path="/404" element={<NotFound />} />
       <Route path="*" element={<Navigate to="/404" replace />} />

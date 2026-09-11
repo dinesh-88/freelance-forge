@@ -18,6 +18,8 @@ export default function DashboardNav({
   const isInvoices = location.pathname.startsWith("/app/invoices");
   const isReports = location.pathname.startsWith("/app/reports");
   const isExpenses = location.pathname.startsWith("/app/expenses");
+  const isIncome = location.pathname.startsWith("/app/income");
+  const isTracker = location.pathname.startsWith("/app/tracker");
 
   return (
     <nav className="flex flex-wrap items-center gap-3 rounded-2xl border border-white/70 bg-white/80 px-4 py-3 text-sm text-slate shadow-lift">
@@ -56,6 +58,22 @@ export default function DashboardNav({
         to="/app/expenses"
       >
         Expenses
+      </Link>
+      <Link
+        className={`rounded-full px-3 py-1 transition ${
+          isIncome ? "bg-ink text-white" : "hover:bg-ink/10"
+        }`}
+        to="/app/income"
+      >
+        Income
+      </Link>
+      <Link
+        className={`rounded-full px-3 py-1 transition ${
+          isTracker ? "bg-ink text-white" : "hover:bg-ink/10"
+        }`}
+        to="/app/tracker"
+      >
+        Tracker
       </Link>
       <Link
         className={`rounded-full px-3 py-1 transition ${

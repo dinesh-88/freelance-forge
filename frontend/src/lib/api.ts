@@ -51,6 +51,16 @@ export type Expense = {
   receipt_url?: string | null;
 };
 
+export type Income = {
+  id: string;
+  source: string;
+  description: string;
+  amount: number;
+  currency: string;
+  date: string;
+  category?: string | null;
+};
+
 export type ReceiptUpload = {
   upload_url: string;
   receipt_url: string;
@@ -233,6 +243,38 @@ export const api = {
     fetchJson<ReceiptUpload>("/expenses/receipt-url", {
       method: "POST",
       body: JSON.stringify(payload),
+    }),
+  listIncome: () => fetchJson<Income[]>("/income"),
+  createIncome: (payload: {
+    source: string;
+    description: string;
+    amount: number;
+    currency: string;
+    date: string;
+    category?: string | null;
+  }) =>
+    fetchJson<Income>("/income", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+  updateIncome: (
+    id: string,
+    payload: Partial<{
+      source: string;
+      description: string;
+      amount: number;
+      currency: string;
+      date: string;
+      category?: string | null;
+    }>
+  ) =>
+    fetchJson<Income>(`/income/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    }),
+  deleteIncome: (id: string) =>
+    fetchJson<void>(`/income/${id}`, {
+      method: "DELETE",
     }),
   improveLineItem: (payload: { description: string }) =>
     fetchJson<LineItemImprove>("/ai/line-item-improve", {

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
-import type { Expense, Invoice, User } from "../lib/api";
+import type { Expense, Income, Invoice, User } from "../lib/api";
 import DashboardHeader from "../components/DashboardHeader";
 import DashboardNav from "../components/DashboardNav";
 import { currencySymbol } from "../lib/currency";
@@ -12,6 +12,7 @@ export default function Reports() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [income, setIncome] = useState<Income[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [status, setStatus] = useState<string | null>(null);
   const currentYear = new Date().getFullYear();
@@ -38,6 +39,12 @@ export default function Reports() {
     } else {
       setStatus(invoiceResult.error);
     }
+    const incomeResult = await api.listIncome();
+    if (incomeResult.ok) {
+      setIncome(incomeResult.data);
+    } else {
+      setStatus(incomeResult.error);
+    }
     const expenseResult = await api.listExpenses();
     if (expenseResult.ok) {
       setExpenses(expenseResult.data);
@@ -53,23 +60,34 @@ export default function Reports() {
       const date = new Date(dateValue);
       return date >= start && date <= end;
     };
-    const totalRevenue = invoices
+    const invoiceRevenue = invoices
       .filter((invoice) => inRange(invoice.date))
       .reduce((sum, invoice) => sum + invoice.total_amount, 0);
+    const manualIncome = income
+      .filter((item) => inRange(item.date))
+      .reduce((sum, item) => sum + item.amount, 0);
+    const totalRevenue = invoiceRevenue + manualIncome;
     const totalExpenses = expenses
       .filter((expense) => inRange(expense.date))
       .reduce((sum, expense) => sum + expense.amount, 0);
     const rangedInvoices = invoices.filter((invoice) => inRange(invoice.date));
-    const avgInvoice = rangedInvoices.length ? totalRevenue / rangedInvoices.length : 0;
+    const avgInvoice = rangedInvoices.length ? invoiceRevenue / rangedInvoices.length : 0;
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
-    const monthRevenue = invoices
-      .filter((invoice) => {
-        const date = new Date(invoice.date);
-        return date.getFullYear() === currentYear && date.getMonth() === currentMonth;
-      })
-      .reduce((sum, invoice) => sum + invoice.total_amount, 0);
+    const monthRevenue =
+      invoices
+        .filter((invoice) => {
+          const date = new Date(invoice.date);
+          return date.getFullYear() === currentYear && date.getMonth() === currentMonth;
+        })
+        .reduce((sum, invoice) => sum + invoice.total_amount, 0) +
+      income
+        .filter((item) => {
+          const date = new Date(item.date);
+          return date.getFullYear() === currentYear && date.getMonth() === currentMonth;
+        })
+        .reduce((sum, item) => sum + item.amount, 0);
     const monthExpenses = expenses
       .filter((expense) => {
         const date = new Date(expense.date);
@@ -83,7 +101,7 @@ export default function Reports() {
       monthRevenue,
       monthExpenses,
     };
-  }, [invoices, expenses, range]);
+  }, [invoices, income, expenses, range]);
 
   const monthlySeries = useMemo(() => {
     const startDate = new Date(range.start);
@@ -99,31 +117,43 @@ export default function Reports() {
     const last = new Date(end.getFullYear(), end.getMonth(), 1);
     while (cursor <= last) {
       const label = `${MONTHS[cursor.getMonth()]} ${String(cursor.getFullYear()).slice(-2)}`;
-      const value = invoices
-        .filter((invoice) => {
-          const date = new Date(invoice.date);
-          return date.getFullYear() === cursor.getFullYear() && date.getMonth() === cursor.getMonth();
-        })
-        .reduce((sum, invoice) => sum + invoice.total_amount, 0);
+      const value =
+        invoices
+          .filter((invoice) => {
+            const date = new Date(invoice.date);
+            return date.getFullYear() === cursor.getFullYear() && date.getMonth() === cursor.getMonth();
+          })
+          .reduce((sum, invoice) => sum + invoice.total_amount, 0) +
+        income
+          .filter((item) => {
+            const date = new Date(item.date);
+            return date.getFullYear() === cursor.getFullYear() && date.getMonth() === cursor.getMonth();
+          })
+          .reduce((sum, item) => sum + item.amount, 0);
       series.push({ label, value });
       cursor.setMonth(cursor.getMonth() + 1);
     }
     return series;
-  }, [invoices, range]);
+  }, [invoices, income, range]);
 
   const availableYears = useMemo(() => {
     const years = new Set<number>();
     invoices.forEach((invoice) => years.add(new Date(invoice.date).getFullYear()));
+    income.forEach((item) => years.add(new Date(item.date).getFullYear()));
     expenses.forEach((expense) => years.add(new Date(expense.date).getFullYear()));
     years.add(currentYear);
     return Array.from(years).sort((a, b) => b - a);
-  }, [invoices, expenses, currentYear]);
+  }, [invoices, income, expenses, currentYear]);
 
   const yearlyTotals = useMemo(() => {
     const year = Number(summaryYear);
-    const totalRevenue = invoices
-      .filter((invoice) => new Date(invoice.date).getFullYear() === year)
-      .reduce((sum, invoice) => sum + invoice.total_amount, 0);
+    const totalRevenue =
+      invoices
+        .filter((invoice) => new Date(invoice.date).getFullYear() === year)
+        .reduce((sum, invoice) => sum + invoice.total_amount, 0) +
+      income
+        .filter((item) => new Date(item.date).getFullYear() === year)
+        .reduce((sum, item) => sum + item.amount, 0);
     const totalExpenses = expenses
       .filter((expense) => new Date(expense.date).getFullYear() === year)
       .reduce((sum, expense) => sum + expense.amount, 0);
@@ -132,7 +162,7 @@ export default function Reports() {
       totalExpenses,
       net: totalRevenue - totalExpenses,
     };
-  }, [invoices, expenses, summaryYear]);
+  }, [invoices, income, expenses, summaryYear]);
 
   const maxValue = Math.max(...monthlySeries.map((item) => item.value), 1);
 

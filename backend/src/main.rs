@@ -30,6 +30,11 @@ use modules::expenses::{
     delete_expense, list_expenses, update_expense, ExpenseCreateRequest, ExpenseResponse,
     ExpenseUpdateRequest, ReceiptUploadRequest, ReceiptUploadResponse,
 };
+use modules::income::{
+    __path_create_income, __path_delete_income, __path_list_income, __path_update_income,
+    create_income, delete_income, list_income, update_income, IncomeCreateRequest,
+    IncomeResponse, IncomeUpdateRequest,
+};
 use modules::invoices::{
     __path_create_invoice, __path_get_invoice, __path_get_invoice_pdf, __path_list_invoices,
     __path_update_invoice, __path_create_template, __path_list_templates, __path_update_template,
@@ -62,6 +67,10 @@ use modules::shared::AppState;
         update_expense,
         delete_expense,
         create_receipt_upload_url,
+        list_income,
+        create_income,
+        update_income,
+        delete_income,
         improve_line_item,
         last_line_item,
         register,
@@ -86,6 +95,9 @@ use modules::shared::AppState;
         ExpenseResponse,
         ReceiptUploadRequest,
         ReceiptUploadResponse,
+        IncomeCreateRequest,
+        IncomeUpdateRequest,
+        IncomeResponse,
         ImproveLineItemRequest,
         ImproveLineItemResponse,
         LastLineItemResponse,
@@ -101,6 +113,7 @@ use modules::shared::AppState;
         (name = "auth", description = "Authentication"),
         (name = "company", description = "Company onboarding"),
         (name = "expenses", description = "Expense management"),
+        (name = "income", description = "Income management"),
         (name = "ai", description = "AI helpers")
     )
 )]
@@ -136,6 +149,10 @@ async fn main() -> anyhow::Result<()> {
         .route("/expenses/:id", axum::routing::patch(update_expense))
         .route("/expenses/:id", axum::routing::delete(delete_expense))
         .route("/expenses/receipt-url", post(create_receipt_upload_url))
+        .route("/income", get(list_income))
+        .route("/income", post(create_income))
+        .route("/income/:id", axum::routing::patch(update_income))
+        .route("/income/:id", axum::routing::delete(delete_income))
         .route("/ai/line-item-improve", post(improve_line_item))
         .route("/ai/line-item-last", get(last_line_item))
         .route("/auth/register", post(register))

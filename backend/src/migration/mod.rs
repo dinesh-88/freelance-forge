@@ -14,6 +14,7 @@ mod m20260201_000011_invoice_template_html;
 mod m20260201_000012_invoice_line_item_mode;
 mod m20260201_000013_invoice_number;
 mod m20260201_000014_expenses;
+mod m20260201_000015_income;
 
 pub struct Migrator;
 
@@ -35,6 +36,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260201_000012_invoice_line_item_mode::Migration),
             Box::new(m20260201_000013_invoice_number::Migration),
             Box::new(m20260201_000014_expenses::Migration),
+            Box::new(m20260201_000015_income::Migration),
         ]
     }
 }
